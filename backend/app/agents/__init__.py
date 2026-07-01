@@ -8,6 +8,9 @@ from app.agents.researcher import ResearchAgent
 from app.agents.evidence import EvidenceAgent
 from app.agents.verification import VerificationAgent
 from app.agents.gap_analysis import GapAnalysisAgent
+from app.agents.writer import WriterAgent
+from app.agents.critic import CriticAgent
+from app.agents.visualization import VisualizationAgent
 
 __all__ = [
     "BaseAgent",
@@ -16,4 +19,7 @@ __all__ = [
     "EvidenceAgent",
     "VerificationAgent",
     "GapAnalysisAgent",
+    "WriterAgent",
+    "CriticAgent",
+    "VisualizationAgent",
 ]
