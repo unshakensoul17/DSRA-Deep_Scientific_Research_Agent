@@ -193,3 +193,17 @@ class ExportBundle(DSRABaseModel):
     json_path: Optional[str] = None
     export_completed_at: datetime = Field(default_factory=datetime.utcnow)
     file_sizes: dict[str, int] = Field(default_factory=dict)
+
+
+# ── ResearchAgent ─────────────────────────────────────────────────────────────
+
+class ResearchAgentInput(DSRABaseModel):
+    session_id: UUID
+    query: SearchQuery
+    max_results: int = Field(default=10, ge=1, le=50)
+
+
+class ResearchAgentOutput(DSRABaseModel):
+    session_id: UUID
+    results: list[SourceResult]
+
