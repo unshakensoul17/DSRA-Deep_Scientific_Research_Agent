@@ -12,7 +12,9 @@
 **PHASE 3: COMPLETE ✅**
 **PHASE 4: COMPLETE ✅**
 **PHASE 5: COMPLETE ✅**
-**PHASE 6: PENDING ⏳**
+**PHASE 6: COMPLETE ✅**
+**PHASE 7: COMPLETE ✅**
+**PHASE 8: PENDING ⏳**
 
 ---
 
@@ -25,13 +27,14 @@
 | 3 | Design database schemas, models, relationships | ✅ COMPLETE |
 | 4 | Design orchestrator, state management, workflow engine | ✅ COMPLETE |
 | 5 | Implement Planner Agent | ✅ COMPLETE |
-| 6 | Implement retrieval agents (one by one) | ⏳ PENDING |
-| 7 | Evidence extraction, ranking, verification | ⏳ NOT STARTED |
-| 8 | Gap analysis, iterative research | ⏳ NOT STARTED |
+| 6 | Implement retrieval agents (one by one) | ✅ COMPLETE |
+| 7 | Evidence extraction, ranking, verification | ✅ COMPLETE |
+| 8 | Gap analysis, iterative research | ⏳ PENDING |
 | 9 | Writer Agent, Critic Agent, Visualization | ⏳ NOT STARTED |
 | 10 | Frontend, streaming, timeline, dashboard | ⏳ NOT STARTED |
 | 11 | Authentication, database, history, collections | ⏳ NOT STARTED |
 | 12 | Optimization, refactoring, testing, documentation, deployment | ⏳ NOT STARTED |
+
 
 ---
 
@@ -71,9 +74,20 @@
 | `backend/app/llm/prompts/planner.py` | 5 | Decomposing prompt template subclass |
 | `backend/app/agents/planner.py` | 5 | PlannerAgent class implementation |
 | `backend/tests/unit/agents/test_planner.py` | 5 | Pytest unit test coverage verifying planner schema, outputs, and parameters |
-
-
-
+| `backend/app/retrievers/base.py` | 6 | Base class interface for all search API adapters |
+| `backend/app/retrievers/arxiv.py` | 6 | arXiv search API adapter parsing XML entries via ET |
+| `backend/app/retrievers/semantic_scholar.py` | 6 | Semantic Scholar graph database API adapter |
+| `backend/app/retrievers/pubmed.py` | 6 | PubMed NCBI E-Utilities API adapter fetching summaries |
+| `backend/app/retrievers/wikipedia.py` | 6 | Wikipedia MediaWiki text snippet adapter |
+| `backend/app/retrievers/google_cse.py` | 6 | Google Custom Search API adapter |
+| `backend/app/agents/researcher.py` | 6 | ResearchAgent orchestrating queries across all engines concurrently |
+| `backend/tests/unit/agents/test_researcher.py` | 6 | Pytest unit tests verifying ResearchAgent routing |
+| `backend/app/llm/prompts/evidence.py` | 7 | EvidencePrompt system instructions template |
+| `backend/app/llm/prompts/verification.py` | 7 | VerificationPrompt system instructions template |
+| `backend/app/agents/evidence.py` | 7 | EvidenceAgent extracting atomic claims and scoring quality |
+| `backend/app/agents/verification.py` | 7 | VerificationAgent matching contradiction and support citation paths |
+| `backend/tests/unit/agents/test_evidence.py` | 7 | Pytest unit test coverage verifying EvidenceAgent output |
+| `backend/tests/unit/agents/test_verification.py` | 7 | Pytest unit test coverage verifying VerificationAgent output |
 
 ---
 

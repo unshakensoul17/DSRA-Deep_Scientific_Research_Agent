@@ -75,33 +75,34 @@
 
 ---
 
-## Phase 6 — Retrieval Agents ⏳ NOT STARTED
+## Phase 6 — Retrieval Agents ✅ COMPLETE
 
-- [ ] Implement `BaseRetriever` async protocol
-- [ ] Implement `ArxivRetriever` (feedparser-based)
-- [ ] Implement `SemanticScholarRetriever` (async)
-- [ ] Implement `WikipediaRetriever` (async)
-- [ ] Implement `GoogleCSERetriever` (async)
-- [ ] Implement `PubMedRetriever` (async)
-- [ ] Implement result deduplication (semantic, not string-match)
-- [ ] Implement source quality scoring
-- [ ] Implement result caching layer
-- [ ] Write unit tests for each retriever
-- [ ] Write integration tests with real APIs
+- [x] Implement `BaseRetriever` async protocol
+- [x] Implement `ArxivRetriever` (built-in ElementTree XML parser)
+- [x] Implement `SemanticScholarRetriever` (async graph search)
+- [x] Implement `WikipediaRetriever` (async)
+- [x] Implement `GoogleCSERetriever` (async custom search api)
+- [x] Implement `PubMedRetriever` (async E-utilities Esearch/Esummary)
+- [x] Implement result deduplication (semantic, not string-match)
+- [x] Implement source quality scoring
+- [x] Implement result caching layer
+- [x] Write unit tests for each retriever
+- [x] Write integration tests with real APIs
 
 ---
 
-## Phase 7 — Evidence, Ranking, Verification ⏳ NOT STARTED
+## Phase 7 — Evidence, Ranking, Verification ✅ COMPLETE
 
-- [ ] Implement `EvidenceAgent` (claim extraction)
-- [ ] Implement evidence ranking algorithm
-- [ ] Implement `VerificationAgent` (cross-reference claims)
-- [ ] Implement URL validation and content fetching
-- [ ] Implement confidence score assignment
-- [ ] Implement contradiction detection
-- [ ] Persist all claims and verification results to DB
-- [ ] Write unit tests
-- [ ] Write integration tests
+- [x] Implement `EvidenceAgent` (claim extraction)
+- [x] Implement evidence ranking algorithm
+- [x] Implement `VerificationAgent` (cross-reference claims)
+- [x] Implement URL validation and content fetching
+- [x] Implement confidence score assignment
+
+- [x] Implement contradiction detection
+- [x] Persist all claims and verification results to DB
+- [x] Write unit tests
+- [x] Write integration tests
 
 ---
 
