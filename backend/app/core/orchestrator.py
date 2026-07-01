@@ -339,9 +339,9 @@ class ResearchOrchestrator:
             session_id=session.id,
             topic=session.topic,
             depth=session.depth,
-            max_sources_per_query=session.max_sources_per_query,
-            source_preferences=[SourceType(pref) for pref in session.source_preferences] if hasattr(session, "source_preferences") else list(SourceType),
-            focus_areas=session.focus_areas or []
+            max_sources_per_query=getattr(session, "max_sources_per_query", settings.default_max_sources_per_query),
+            source_preferences=[SourceType(pref) for pref in session.source_preferences] if getattr(session, "source_preferences", None) else list(SourceType),
+            focus_areas=getattr(session, "focus_areas", None) or []
         )
         
         agent = PlannerAgent()

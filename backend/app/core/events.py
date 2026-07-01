@@ -55,12 +55,12 @@ class EventBroker:
             queues = self._listeners.get(session_id, set()).copy()
 
         if not queues:
-            log.debug("no_active_listeners_for_event", session_id=str(session_id), event=event.event)
+            log.debug("no_active_listeners_for_event", session_id=str(session_id), event_type=event.event)
             return
 
         for queue in queues:
             await queue.put(event)
-        log.debug("sse_event_published", session_id=str(session_id), event=event.event)
+        log.debug("sse_event_published", session_id=str(session_id), event_type=event.event)
 
 
 # Global singleton instance
