@@ -147,16 +147,16 @@
 
 ---
 
-## Phase 11 — Authentication, Database, History ⏳ NOT STARTED
+## Phase 11 — Authentication, Database, History ✅ COMPLETE
 
-- [ ] Implement JWT authentication middleware
-- [ ] Implement user registration and login endpoints
-- [ ] Implement research session ownership
-- [ ] Implement research history API
-- [ ] Implement saved reports API
-- [ ] Implement collections API
-- [ ] Implement rate limiting middleware
-- [ ] Write security tests
+- [x] Implement JWT authentication middleware
+- [x] Implement user registration and login endpoints
+- [x] Implement research session ownership
+- [x] Implement research history API
+- [x] Implement saved reports API
+- [x] Implement collections API
+- [x] Implement rate limiting middleware
+- [x] Write security tests
 
 ---
 

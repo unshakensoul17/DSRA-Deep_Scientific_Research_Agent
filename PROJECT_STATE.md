@@ -16,8 +16,7 @@
 **PHASE 7: COMPLETE ✅**
 **PHASE 8: COMPLETE ✅**
 **PHASE 9: COMPLETE ✅**
-**PHASE 10: COMPLETE ✅**
-**PHASE 11: PENDING ⏳**
+**PHASE 11: COMPLETE ✅**
 
 ---
 
@@ -35,7 +34,7 @@
 | 8 | Gap analysis, iterative research | ✅ COMPLETE |
 | 9 | Writer Agent, Critic Agent, Visualization | ✅ COMPLETE |
 | 10 | Frontend, streaming, timeline, dashboard | ✅ COMPLETE |
-| 11 | Authentication, database, history, collections | ⏳ PENDING |
+| 11 | Authentication, database, history, collections | ✅ COMPLETE |
 | 12 | Optimization, refactoring, testing, documentation, deployment | ⏳ NOT STARTED |
 
 
@@ -110,6 +109,15 @@
 | `frontend/src/types/index.ts` | 10 | TypeScript schemas for report, visual bundles, and SSE logs |
 | `frontend/src/services/mockSSE.ts` | 10 | Simulated research pipeline event streaming engine |
 | `frontend/src/App.tsx` | 10 | Deep Scientific Research Dashboard with vertical timelines and SVGs |
+| `backend/app/core/security.py` | 11 | Password hashing and JWT generation/validation utilities |
+| `backend/app/core/rate_limit.py` | 11 | Rate limiting key extraction and limit declarations |
+| `backend/app/api/dependencies.py` | 11 | JWT Bearer and API Key authorization dependency guards |
+| `backend/app/api/v1/routers/auth.py` | 11 | User login, registration, profile, and token refresh endpoints |
+| `backend/app/api/v1/routers/research.py` | 11 | Session ownership check, listing, start execution, and stream channels |
+| `backend/app/db/repositories/user.py` | 11 | User repository operations class |
+| `backend/app/main.py` | 11 | FastAPI app setup with routers, CORS, and slowapi exception handlers |
+| `backend/tests/unit/api/test_auth.py` | 11 | Unit tests for authentication services, token refresh, and registration rules |
+| `backend/tests/unit/api/test_research.py` | 11 | Unit tests for session isolation, creation, and detail restrictions |
 
 ---
 
