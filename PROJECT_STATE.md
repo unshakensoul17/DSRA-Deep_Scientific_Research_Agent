@@ -1,0 +1,99 @@
+# DSRA V2 — Project State
+
+> **Living Document** — Updated after every significant change.
+> Last updated: 2026-07-01
+
+---
+
+## Current Phase
+
+**PHASE 1: COMPLETE ✅**
+**PHASE 2: COMPLETE ✅**
+**PHASE 3: COMPLETE ✅**
+**PHASE 4: COMPLETE ✅**
+**PHASE 5: PENDING ⏳**
+
+---
+
+## Phase Completion Status
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 1 | Analyze old project, identify weaknesses, produce migration doc | ✅ COMPLETE |
+| 2 | Design new architecture, folder structure, data flow, agents, state machine | ✅ COMPLETE |
+| 3 | Design database schemas, models, relationships | ✅ COMPLETE |
+| 4 | Design orchestrator, state management, workflow engine | ✅ COMPLETE |
+| 5 | Implement Planner Agent | ⏳ PENDING |
+| 6 | Implement retrieval agents (one by one) | ⏳ NOT STARTED |
+| 7 | Evidence extraction, ranking, verification | ⏳ NOT STARTED |
+| 8 | Gap analysis, iterative research | ⏳ NOT STARTED |
+| 9 | Writer Agent, Critic Agent, Visualization | ⏳ NOT STARTED |
+| 10 | Frontend, streaming, timeline, dashboard | ⏳ NOT STARTED |
+| 11 | Authentication, database, history, collections | ⏳ NOT STARTED |
+| 12 | Optimization, refactoring, testing, documentation, deployment | ⏳ NOT STARTED |
+
+---
+
+## Deliverables Produced
+
+| File | Phase | Description |
+|------|-------|-------------|
+| `docs/PHASE_1_ANALYSIS.md` | 1 | Full forensic audit of V1 prototype (25 weaknesses documented) |
+| `PROJECT_STATE.md` | 1-4 | This file (updated phase completion tracker) |
+| `DECISIONS.md` | 1 | Technology and architecture decision log |
+| `TODO.md` | 1-4 | Remaining work tracker |
+| `ARCHITECTURE.md` | 2 | Full system architecture design, data flow, state machine, DB schema & SSE design |
+| `AGENTS.md` | 2 | Defined contracts, input/output schemas for all 9 agents |
+| `API_SPEC.md` | 2 | REST API endpoints, schemas, response examples, and SSE event documentation |
+| `backend/pyproject.toml` | 2 | Configured project dependencies, formatting settings, and dev tools |
+| `backend/.env.example` | 2 | Complete list of all required environment variables |
+| `backend/app/config/settings.py` | 2 | Config settings validator using Pydantic Settings |
+| `backend/app/exceptions/base.py` | 2 | Custom exceptions hierarchy definitions |
+| `backend/app/exceptions/handlers.py` | 2 | Global FastAPI exception handlers |
+| `backend/app/schemas/common.py` | 2 | Core Pydantic domain models and enums |
+| `backend/app/schemas/api/*` | 2 | API request/response validation schemas |
+| `backend/app/schemas/agents/*` | 2 | Individual Agent input and output schemas |
+| `backend/app/core/logging.py` | 2 | Configured asynchronous logging with structlog |
+| `backend/app/db/base.py` | 3 | DeclarativeBase metadata |
+| `backend/app/db/session.py` | 3 | Async database engine and session maker |
+| `backend/app/db/models/*` | 3 | All SQL database models (User, ResearchSession, Query, Source, Claim, Report, AgentLog) |
+| `backend/app/db/repositories/*` | 3 | Repository implementation classes (BaseRepository, ResearchSessionRepository, etc.) |
+| `backend/alembic.ini` | 3 | Alembic configuration file |
+| `backend/migrations/env.py` | 3 | Asynchronous migrations setup file |
+| `backend/app/core/events.py` | 4 | Real-time Server-Sent Events broker implementation |
+| `backend/app/core/state.py` | 4 | StateMachine transition rules and validator |
+| `backend/app/core/workflow.py` | 4 | Asynchronous DAG workflow execution engine |
+| `backend/app/core/orchestrator.py` | 4 | Core orchestrator coordinating database updates, SSE, and agent loop |
+
+
+
+---
+
+## Key Decisions Locked In Phase 1
+
+- Backend: FastAPI (async)
+- ORM: SQLAlchemy 2.0 async
+- Database: PostgreSQL
+- Migrations: Alembic
+- Vector DB: ChromaDB
+- LLM Client: Abstracted via `LLMGateway` (OpenAI primary)
+- HTTP Client: aiohttp
+- Validation: Pydantic v2
+- Logging: structlog
+- Frontend: React + Vite + TypeScript
+- Streaming: Server-Sent Events (SSE)
+- Testing: pytest + pytest-asyncio
+
+---
+
+## Blocking Issues
+
+None at this stage.
+
+---
+
+## Notes
+
+- V1 code in `DSRA-Deep-Scientific-And-Research-Agent-/` treated as reference only
+- No code from V1 will be copied directly into V2
+- V2 project root: `/home/unshakensoul/Documents/dsra/dsra-v2/`
