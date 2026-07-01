@@ -15,7 +15,8 @@
 **PHASE 6: COMPLETE ✅**
 **PHASE 7: COMPLETE ✅**
 **PHASE 8: COMPLETE ✅**
-**PHASE 9: PENDING ⏳**
+**PHASE 9: COMPLETE ✅**
+**PHASE 10: PENDING ⏳**
 
 ---
 
@@ -31,8 +32,9 @@
 | 6 | Implement retrieval agents (one by one) | ✅ COMPLETE |
 | 7 | Evidence extraction, ranking, verification | ✅ COMPLETE |
 | 8 | Gap analysis, iterative research | ✅ COMPLETE |
-| 9 | Writer Agent, Critic Agent, Visualization | ⏳ PENDING |
-| 10 | Frontend, streaming, timeline, dashboard | ⏳ NOT STARTED |
+| 9 | Writer Agent, Critic Agent, Visualization | ✅ COMPLETE |
+| 10 | Frontend, streaming, timeline, dashboard | ⏳ PENDING |
+
 | 11 | Authentication, database, history, collections | ⏳ NOT STARTED |
 
 | 12 | Optimization, refactoring, testing, documentation, deployment | ⏳ NOT STARTED |
@@ -93,6 +95,17 @@
 | `backend/app/llm/prompts/gap_analysis.py` | 8 | GapAnalysisPrompt system instructions template |
 | `backend/app/agents/gap_analysis.py` | 8 | GapAnalysisAgent class implementation |
 | `backend/tests/unit/agents/test_gap_analysis.py` | 8 | Pytest unit test coverage verifying GapAnalysisAgent output |
+| `backend/app/llm/prompts/writer.py` | 9 | WriterPrompt system instructions template |
+| `backend/app/llm/prompts/critic.py` | 9 | CriticPrompt system instructions template |
+| `backend/app/llm/prompts/visualization.py` | 9 | VisualizationPrompt system instructions template |
+| `backend/app/agents/writer.py` | 9 | WriterAgent writing structured drafts |
+| `backend/app/agents/critic.py` | 9 | CriticAgent scoring drafts against academic rubrics |
+| `backend/app/agents/visualization.py` | 9 | VisualizationAgent extracting visual bundles |
+| `backend/app/agents/export.py` | 9 | ExportAgent compiling download packages |
+| `backend/tests/unit/agents/test_writer.py` | 9 | Pytest unit test coverage verifying WriterAgent outputs |
+| `backend/tests/unit/agents/test_critic.py` | 9 | Pytest unit test coverage verifying CriticAgent outputs |
+| `backend/tests/unit/agents/test_visualization.py` | 9 | Pytest unit test coverage verifying VisualizationAgent outputs |
+| `backend/tests/unit/agents/test_export.py` | 9 | Pytest unit test coverage verifying ExportAgent outputs |
 
 ---
 

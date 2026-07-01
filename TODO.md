@@ -119,15 +119,15 @@
 
 ---
 
-## Phase 9 — Writer, Critic, Visualization ⏳ NOT STARTED
+## Phase 9 — Writer, Critic, Visualization ✅ COMPLETE
 
-- [ ] Implement `WriterAgent` with structured section generation
-- [ ] Implement full report schema (all required sections)
-- [ ] Implement `CriticAgent` with evaluation rubrics
-- [ ] Implement `VisualizationAgent` (tables, timelines, knowledge maps)
-- [ ] Implement `ExportAgent` (PDF, Markdown, HTML, JSON)
-- [ ] Write unit tests
-- [ ] Write integration tests
+- [x] Implement `WriterAgent` with structured section generation
+- [x] Implement full report schema (all required sections)
+- [x] Implement `CriticAgent` with evaluation rubrics
+- [x] Implement `VisualizationAgent` (tables, timelines, knowledge maps)
+- [x] Implement `ExportAgent` (PDF, Markdown, HTML, JSON)
+- [x] Write unit tests
+- [x] Write integration tests
 
 ---
 
