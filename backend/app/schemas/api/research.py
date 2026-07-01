@@ -20,10 +20,11 @@ from app.schemas.common import (
 
 class ResearchSessionCreateRequest(DSRABaseModel):
     topic: str = Field(..., min_length=3, max_length=500)
-    depth: ResearchDepth = ResearchDepth.NORMAL
+    depth: ResearchDepth = Field(default=ResearchDepth.NORMAL, strict=False)
     max_sources_per_query: int = Field(default=10, ge=1, le=50)
     source_preferences: list[SourceType] = Field(
-        default_factory=lambda: [SourceType.ARXIV, SourceType.SEMANTIC_SCHOLAR, SourceType.WIKIPEDIA]
+        default_factory=lambda: [SourceType.ARXIV, SourceType.SEMANTIC_SCHOLAR, SourceType.WIKIPEDIA],
+        strict=False
     )
     focus_areas: list[str] = Field(default_factory=list)
     max_iterations: int = Field(default=3, ge=1, le=5)
@@ -33,7 +34,7 @@ class ResearchSessionResponse(DSRABaseModel):
     session_id: UUID
     topic: str
     state: SessionState
-    depth: ResearchDepth
+    depth: ResearchDepth = Field(..., strict=False)
     iteration_count: int
     max_iterations: int
     created_at: datetime
