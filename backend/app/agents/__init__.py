@@ -11,6 +11,7 @@ from app.agents.gap_analysis import GapAnalysisAgent
 from app.agents.writer import WriterAgent
 from app.agents.critic import CriticAgent
 from app.agents.visualization import VisualizationAgent
+from app.agents.export import ExportAgent
 
 __all__ = [
     "BaseAgent",
@@ -22,4 +23,5 @@ __all__ = [
     "WriterAgent",
     "CriticAgent",
     "VisualizationAgent",
+    "ExportAgent",
 ]
