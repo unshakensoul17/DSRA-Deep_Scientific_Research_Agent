@@ -7,6 +7,7 @@ from app.agents.planner import PlannerAgent
 from app.agents.researcher import ResearchAgent
 from app.agents.evidence import EvidenceAgent
 from app.agents.verification import VerificationAgent
+from app.agents.gap_analysis import GapAnalysisAgent
 
 __all__ = [
     "BaseAgent",
@@ -14,4 +15,5 @@ __all__ = [
     "ResearchAgent",
     "EvidenceAgent",
     "VerificationAgent",
+    "GapAnalysisAgent",
 ]
