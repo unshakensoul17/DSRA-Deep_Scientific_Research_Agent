@@ -56,7 +56,7 @@ class Settings(BaseSettings):
         """Async PostgreSQL connection URL."""
         return (
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}?sslmode=require"
         )
 
     @property
@@ -64,13 +64,13 @@ class Settings(BaseSettings):
         """Sync PostgreSQL URL for Alembic migrations."""
         return (
             f"postgresql+psycopg2://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}?sslmode=require"
         )
 
     # ── LLM ──────────────────────────────────────────────────────────
     gemini_api_key: str = Field(..., min_length=20)
-    gemini_default_model: str = "gemini-1.5-pro"
-    gemini_fallback_model: str = "gemini-1.5-flash"
+    gemini_default_model: str = Field(...)
+    gemini_fallback_model: str = Field(...)
     gemini_max_retries: int = Field(default=3, ge=1, le=10)
     gemini_request_timeout: int = Field(default=120, ge=10, le=600)
 

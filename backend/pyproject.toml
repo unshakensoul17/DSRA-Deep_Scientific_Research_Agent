@@ -32,7 +32,6 @@ aiohttp = "^3.11.10"
 httpx = "^0.28.1"
 
 # Research sources
-feedparser = "^6.0.11"
 
 # Vector database
 chromadb = "^0.6.3"
@@ -52,7 +51,6 @@ structlog = "^24.4.0"
 
 # PDF generation
 reportlab = "^4.2.5"
-Pillow = "^11.0.0"
 
 # Markdown + HTML
 markdown = "^3.7"
