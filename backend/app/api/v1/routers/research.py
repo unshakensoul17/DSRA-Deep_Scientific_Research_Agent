@@ -5,6 +5,7 @@ Endpoints for managing research session creation, listing, status checks,
 running agent workflows as background tasks, and streaming SSE progress logs.
 """
 
+import asyncio
 import json
 from typing import Any, Optional
 import uuid
@@ -309,11 +310,18 @@ async def stream_session_progress(
 
     async def event_generator():
         try:
-            async for sse_event in event_broker.subscribe(session_id):
-                # Standard SSE block formatting
-                # Event lines separated by newlines
-                yield f"event: {str(sse_event.event)}\n"
-                yield f"data: {json.dumps(sse_event.data)}\n\n"
+            generator = event_broker.subscribe(session_id)
+            while True:
+                try:
+                    # Wait for an event, but timeout every 15 seconds to send a heartbeat
+                    sse_event = await asyncio.wait_for(anext(generator), timeout=15.0)
+                    yield f"event: {str(sse_event.event)}\n"
+                    yield f"data: {json.dumps(sse_event.data)}\n\n"
+                except asyncio.TimeoutError:
+                    # Send heartbeat to keep the Render load balancer connection alive
+                    yield "event: heartbeat\ndata: {}\n\n"
+                except StopAsyncIteration:
+                    break
         except Exception as e:
             # Yield error event and abort
             yield f"event: error\n"

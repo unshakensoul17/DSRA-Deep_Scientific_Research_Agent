@@ -24,8 +24,8 @@ class GoogleCSEAdapter(BaseRetrieverAdapter):
 
     async def search(self, query: str, max_results: int = 10) -> list[SourceResult]:
         """Search Google Custom Search Engine."""
-        api_key = settings.google_api_key
-        cx = settings.google_cse_id
+        api_key = settings.google_cse_api_key
+        cx = settings.google_cse_cx
 
         if not api_key or not cx:
             log.warning("google_cse_credentials_missing", api_key_present=bool(api_key), cx_present=bool(cx))

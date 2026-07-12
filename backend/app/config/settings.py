@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     google_cse_api_key: str | None = None
     google_cse_cx: str | None = None
     pubmed_api_key: str | None = None
+    semantic_scholar_api_key: str | None = None
 
 
 
