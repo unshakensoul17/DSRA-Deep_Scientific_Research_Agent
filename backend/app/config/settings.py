@@ -54,18 +54,24 @@ class Settings(BaseSettings):
     @property
     def database_url(self) -> str:
         """Async PostgreSQL connection URL."""
-        return (
+        url = (
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}?sslmode=require"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+        if self.app_env == "production" or "neon.tech" in self.postgres_host:
+            url += "?ssl=require"
+        return url
 
     @property
     def sync_database_url(self) -> str:
         """Sync PostgreSQL URL for Alembic migrations."""
-        return (
+        url = (
             f"postgresql+psycopg2://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}?sslmode=require"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+        if self.app_env == "production" or "neon.tech" in self.postgres_host:
+            url += "?sslmode=require"
+        return url
 
     # ── LLM ──────────────────────────────────────────────────────────
     gemini_api_key: str = Field(..., min_length=20)
