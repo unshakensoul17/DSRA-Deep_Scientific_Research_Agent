@@ -119,22 +119,23 @@ class Settings(BaseSettings):
     log_format: Literal["json", "console"] = "json"
 
     # ── CORS ──────────────────────────────────────────────────────────
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    cors_origins_str: str = Field(
+        default="http://localhost:5173,http://localhost:3000",
+        alias="cors_origins"
+    )
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: str | list[str]) -> list[str]:
-        if isinstance(v, str):
-            # If they provided a JSON-like string but used single quotes or messed up formatting
-            if v.startswith("[") and v.endswith("]"):
-                import json
-                try:
-                    return json.loads(v.replace("'", '"'))
-                except Exception:
-                    pass
-            # Otherwise, fall back to simple comma-separated string parsing
-            return [i.strip() for i in v.strip("[]'\"").split(",") if i.strip()]
-        return v
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parses the comma-separated string into a list for FastAPI."""
+        # If it's formatted like a JSON array, try to clean it
+        raw = self.cors_origins_str
+        if raw.startswith("[") and raw.endswith("]"):
+            import json
+            try:
+                return json.loads(raw.replace("'", '"'))
+            except Exception:
+                pass
+        return [i.strip() for i in raw.strip("[]'\"").split(",") if i.strip()]
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
