@@ -39,8 +39,8 @@ services:
       APP_SECRET_KEY: ${APP_SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GEMINI_DEFAULT_MODEL: gemini-3.1-flash-lite
-      GEMINI_FALLBACK_MODEL: gemini-1.5-flash
+      GEMINI_DEFAULT_MODEL: ${GEMINI_DEFAULT_MODEL}
+      GEMINI_FALLBACK_MODEL: ${GEMINI_FALLBACK_MODEL}
       GEMINI_REQUEST_TIMEOUT: 45
     volumes:
       - shared_exports:/workspace/exports
