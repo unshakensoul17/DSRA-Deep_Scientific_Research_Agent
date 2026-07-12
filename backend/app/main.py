@@ -8,7 +8,7 @@ attaches rate limiters, and binds global exception handlers.
 import structlog
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi.errors import RateLimitExceeded
+
 
 from app.api.v1.routers.auth import router as auth_router
 from app.api.v1.routers.research import router as research_router
@@ -16,7 +16,7 @@ from app.config.settings import get_settings
 
 settings = get_settings()
 from app.core.logging import get_logger
-from app.core.rate_limit import limiter
+
 from app.db.session import check_db_health
 
 log = get_logger(__name__)
@@ -28,9 +28,6 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# Attach slowapi rate limiter state
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler := lambda r, e: limiter._rate_limit_exceeded_handler(r, e))
 
 # CORS configuration
 # Allows connection from local development server (Vite default)
