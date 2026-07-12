@@ -85,16 +85,7 @@ class Settings(BaseSettings):
     google_cse_cx: str | None = None
     pubmed_api_key: str | None = None
 
-    # ── ChromaDB ─────────────────────────────────────────────────────
-    chroma_host: str = "localhost"
-    chroma_port: int = Field(default=8001, ge=1, le=65535)
-    chroma_collection_name: str = "dsra_research"
-    chroma_persist_dir: str = "./data/chroma"
 
-    @property
-    def chroma_use_local(self) -> bool:
-        """In development, use local persistent Chroma. In production, use HTTP client."""
-        return self.app_env == "development"
 
     # ── JWT ───────────────────────────────────────────────────────────
     jwt_secret_key: str = Field(..., min_length=32)
@@ -102,10 +93,7 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = Field(default=60, ge=5)
     jwt_refresh_token_expire_days: int = Field(default=30, ge=1)
 
-    # ── Rate Limiting ─────────────────────────────────────────────────
-    rate_limit_default: str = "60/minute"
-    rate_limit_research_create: str = "5/minute"
-    rate_limit_auth: str = "10/minute"
+
 
     # ── Export ────────────────────────────────────────────────────────
     export_base_dir: str = "./data/exports"
