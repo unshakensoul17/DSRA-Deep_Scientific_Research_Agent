@@ -121,6 +121,21 @@ class Settings(BaseSettings):
     # ── CORS ──────────────────────────────────────────────────────────
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
 
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: str | list[str]) -> list[str]:
+        if isinstance(v, str):
+            # If they provided a JSON-like string but used single quotes or messed up formatting
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    return json.loads(v.replace("'", '"'))
+                except Exception:
+                    pass
+            # Otherwise, fall back to simple comma-separated string parsing
+            return [i.strip() for i in v.strip("[]'\"").split(",") if i.strip()]
+        return v
+
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
         """Enforce stricter rules in production."""
