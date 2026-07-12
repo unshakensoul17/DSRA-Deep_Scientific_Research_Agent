@@ -8,7 +8,12 @@ from typing import ClassVar
 
 from app.agents.base import BaseAgent
 from app.llm.prompts.verification import verification_prompt
-from app.schemas.agents.all_agents import VerificationAgentInput, VerificationAgentOutput
+from app.schemas.agents.all_agents import (
+    VerificationAgentInput,
+    VerificationAgentOutput,
+    VerificationLLMOutput,
+)
+from app.schemas.common import VerifiedClaim
 
 
 class VerificationAgent(BaseAgent[VerificationAgentInput, VerificationAgentOutput]):
@@ -65,16 +70,32 @@ class VerificationAgent(BaseAgent[VerificationAgentInput, VerificationAgentOutpu
             },
         ]
 
-        # Call gateway for validated Pydantic model response
-        output = await self.llm.get_structured_completion(
+        # Call gateway with LLM-facing schema (no runtime UUIDs)
+        llm_output = await self.llm.get_structured_completion(
             messages=messages,
-            response_schema=VerificationAgentOutput,
+            response_schema=VerificationLLMOutput,
             temperature=0.1,
         )
 
-        # Enforce session id mapping
-        output.session_id = input_data.session_id
-        for vc in output.verified_claims:
-            vc.session_id = input_data.session_id
+        # Map LLM claims to runtime VerifiedClaim objects with correct IDs
+        verified_claims = [
+            VerifiedClaim(
+                session_id=input_data.session_id,
+                text=lc.text,
+                confidence=lc.confidence,
+                status=lc.status,
+                supporting_source_ids=[],
+                contradicting_source_ids=[],
+                reasoning=lc.reasoning,
+                iteration=lc.iteration,
+            )
+            for lc in llm_output.verified_claims
+        ]
 
-        return output
+        return VerificationAgentOutput(
+            session_id=input_data.session_id,
+            verified_claims=verified_claims,
+            contradictions_found=llm_output.contradictions_found,
+            high_confidence_claims=llm_output.high_confidence_claims,
+            verification_coverage=llm_output.verification_coverage,
+        )

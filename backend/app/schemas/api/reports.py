@@ -10,6 +10,7 @@ from uuid import UUID
 
 from pydantic import Field
 
+from app.schemas.agents.all_agents import VisualizationBundle
 from app.schemas.common import (
     DSRABaseModel,
     ReportReference,
@@ -36,6 +37,10 @@ class ReportResponse(DSRABaseModel):
     sections: list[ReportSection]
     key_findings: list[str]
     references: list[ReportReference]
+    methodology_description: str
+    limitations: str
+    conclusion: str
+    visualization: Optional[VisualizationBundle] = None
     critique_score: Optional[float] = None
     status: ReportStatus
     export_paths: dict[str, str] = Field(default_factory=dict)

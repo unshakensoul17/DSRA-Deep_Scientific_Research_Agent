@@ -10,7 +10,7 @@ from typing import Any, Optional
 import uuid
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +23,9 @@ from app.db.models.research_session import ResearchSession
 from app.db.models.user import User
 from app.db.repositories.report import ReportRepository
 from app.db.repositories.research_session import ResearchSessionRepository
+from app.db.repositories.user import UserRepository
 from app.db.session import get_db_session
+from app.core.security import decode_token
 from app.schemas.api.reports import ReportListItemResponse, ReportResponse
 from app.schemas.api.research import (
     ResearchSessionCreateRequest,
@@ -32,6 +34,7 @@ from app.schemas.api.research import (
     ResearchSessionStartResponse,
 )
 from app.schemas.common import SessionState, ReportStatus
+from app.schemas.api.claims import ClaimResponse
 
 router = APIRouter(tags=["Research Workspaces"])
 
@@ -136,7 +139,7 @@ async def get_session_details(
     # Compile counts
     sources_count = len(session.sources)
     claims_count = len(session.claims)
-    verified_claims_count = sum(1 for c in session.claims if c.verification_status == "VERIFIED")
+    verified_claims_count = sum(1 for c in session.claims if str(c.status) in ("VERIFIED", "VerificationStatus.VERIFIED"))
     
     # Get active report if finalized
     report_id = None
@@ -148,9 +151,9 @@ async def get_session_details(
     # Format timeline execution log history
     agent_timeline = [
         {
-            "agent": log.agent,
-            "status": log.status,
-            "message": log.message,
+            "agent": log.agent_name,
+            "status": "FAILED" if log.error_message else "COMPLETED",
+            "message": log.error_message or "",
             "timestamp": log.created_at.isoformat() if log.created_at else None
         }
         for log in sorted(session.execution_logs, key=lambda l: l.created_at)
@@ -172,6 +175,29 @@ async def get_session_details(
         report_id=report_id,
         agent_timeline=agent_timeline
     )
+
+
+@router.get("/sessions/{session_id}/claims", response_model=list[ClaimResponse])
+async def get_session_claims(
+    session_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> Any:
+    """Fetch all claims for a specific session."""
+    session_repo = ResearchSessionRepository(db)
+    session = await session_repo.get_by_id_with_relationships(session_id)
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return [
+        ClaimResponse(
+            id=c.id,
+            text=c.text,
+            confidence=c.confidence,
+            status=c.status,
+            source_ids=c.source_ids
+        ) for c in session.claims
+    ]
 
 
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -240,7 +266,7 @@ async def start_session_execution(
             detail="Access forbidden."
         )
         
-    if session.state not in [SessionState.CREATED, SessionState.ERROR, SessionState.COMPLETED]:
+    if session.state not in [SessionState.CREATED, SessionState.FAILED, SessionState.COMPLETED]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot start session in state {session.state}."
@@ -286,7 +312,7 @@ async def stream_session_progress(
             async for sse_event in event_broker.subscribe(session_id):
                 # Standard SSE block formatting
                 # Event lines separated by newlines
-                yield f"event: {sse_event.event.value}\n"
+                yield f"event: {str(sse_event.event)}\n"
                 yield f"data: {json.dumps(sse_event.data)}\n\n"
         except Exception as e:
             # Yield error event and abort
@@ -376,9 +402,161 @@ async def get_report_details(
         sections=report.sections,
         key_findings=report.key_findings,
         references=report.references,
+        methodology_description=report.methodology,
+        limitations=report.limitations,
+        conclusion=report.conclusion,
+        visualization=report.visualization,
         critique_score=report.critique_score,
         status=ReportStatus(report.status),
         export_paths=report.export_paths or {},
         created_at=report.created_at,
         finalized_at=report.finalized_at
     )
+
+@router.get("/sessions/{session_id}/download/{format_ext}")
+async def download_report_export(
+    session_id: UUID,
+    format_ext: str,
+    token: str,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    Download the generated report in various formats (PDF, MD, HTML, JSON, DOCX, ZIP).
+    Uses a token query parameter for authentication instead of Bearer header for easy browser downloading.
+    """
+    payload = decode_token(token)
+    if not payload or payload.get("type") != "access":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    
+    user_repo = UserRepository(db)
+    user_id_str = payload.get("sub")
+    if not user_id_str:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        
+    try:
+        user_id = uuid.UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user ID format")
+        
+    user = await user_repo.get_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        
+    session_repo = ResearchSessionRepository(db)
+    session = await session_repo.get_by_id(session_id)
+    if not session or session.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+        
+    report_repo = ReportRepository(db)
+    report = await report_repo.get_by_session_id(session_id)
+    if not report:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+        
+    fmt = format_ext.lower()
+    
+    # Generate content based on format
+    # In a real app, these would be cached in S3 or generated via dedicated libraries.
+    # We generate a faithful mock representation here using the actual database report object.
+    
+    if fmt == "json":
+        content = json.dumps({
+            "title": report.title,
+            "executive_summary": report.executive_summary,
+            "sections": report.sections,
+            "key_findings": report.key_findings,
+            "methodology": report.methodology,
+            "limitations": report.limitations,
+            "conclusion": report.conclusion,
+            "references": report.references,
+        }, indent=2)
+        return Response(content=content, media_type="application/json", headers={
+            "Content-Disposition": f"attachment; filename=report_{session_id}.json"
+        })
+        
+    # Generate Markdown base for MD, HTML, DOCX, PDF
+    md_content = f"# {report.title}\n\n## Executive Summary\n{report.executive_summary}\n\n## Key Findings\n"
+    for finding in report.key_findings:
+        md_content += f"- {finding}\n"
+    for sec in report.sections:
+        md_content += f"\n## {sec.get('heading', 'Section')}\n{sec.get('content', '')}\n"
+    md_content += f"\n## Methodology\n{report.methodology}\n"
+    md_content += f"\n## Limitations\n{report.limitations}\n"
+    md_content += f"\n## Conclusion\n{report.conclusion}\n"
+    
+    if fmt == "md":
+        return Response(content=md_content, media_type="text/markdown", headers={
+            "Content-Disposition": f"attachment; filename=report_{session_id}.md"
+        })
+        
+    if fmt == "html":
+        import markdown
+        html_body = markdown.markdown(md_content)
+        html_content = f"<html><head><title>{report.title}</title><style>body{{font-family:sans-serif;line-height:1.6;margin:40px auto;max-width:800px;color:#333;}}h1,h2{{color:#111;}}</style></head><body>{html_body}</body></html>"
+        return Response(content=html_content, media_type="text/html", headers={
+            "Content-Disposition": f"attachment; filename=report_{session_id}.html"
+        })
+        
+    if fmt == "docx":
+        import io
+        import docx
+        doc = docx.Document()
+        doc.add_heading(report.title, 0)
+        doc.add_heading('Executive Summary', level=1)
+        doc.add_paragraph(report.executive_summary)
+        doc.add_heading('Key Findings', level=1)
+        for finding in report.key_findings:
+            doc.add_paragraph(finding, style='List Bullet')
+        for sec in report.sections:
+            doc.add_heading(sec.get('heading', 'Section'), level=1)
+            doc.add_paragraph(sec.get('content', ''))
+            
+        doc_io = io.BytesIO()
+        doc.save(doc_io)
+        doc_io.seek(0)
+        return Response(content=doc_io.read(), media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={
+            "Content-Disposition": f"attachment; filename=report_{session_id}.docx"
+        })
+        
+    if fmt == "pdf":
+        import io
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet
+        
+        pdf_io = io.BytesIO()
+        doc = SimpleDocTemplate(pdf_io, pagesize=letter)
+        styles = getSampleStyleSheet()
+        Story = []
+        
+        Story.append(Paragraph(report.title, styles['Title']))
+        Story.append(Spacer(1, 12))
+        Story.append(Paragraph('Executive Summary', styles['Heading1']))
+        Story.append(Paragraph(report.executive_summary, styles['Normal']))
+        Story.append(Spacer(1, 12))
+        
+        for sec in report.sections:
+            Story.append(Paragraph(sec.get('heading', 'Section'), styles['Heading1']))
+            Story.append(Paragraph(sec.get('content', ''), styles['Normal']))
+            Story.append(Spacer(1, 12))
+            
+        doc.build(Story)
+        pdf_io.seek(0)
+        return Response(content=pdf_io.read(), media_type="application/pdf", headers={
+            "Content-Disposition": f"attachment; filename=report_{session_id}.pdf"
+        })
+        
+    if fmt == "zip":
+        import io
+        import zipfile
+        
+        zip_io = io.BytesIO()
+        with zipfile.ZipFile(zip_io, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(f"report_{session_id}.json", json.dumps(report.sections, indent=2))
+            zf.writestr(f"report_{session_id}.md", md_content)
+            
+        zip_io.seek(0)
+        return Response(content=zip_io.read(), media_type="application/zip", headers={
+            "Content-Disposition": f"attachment; filename=report_package_{session_id}.zip"
+        })
+        
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported format")

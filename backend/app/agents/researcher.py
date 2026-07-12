@@ -6,6 +6,7 @@ Routes individual search queries to the appropriate engine adapter.
 
 from typing import ClassVar
 import aiohttp
+import time
 
 from app.agents.base import BaseAgent
 from app.retrievers.arxiv import ArxivAdapter
@@ -35,31 +36,43 @@ class ResearchAgent(BaseAgent[ResearchAgentInput, ResearchAgentOutput]):
         source_type = input_data.query.source_type
         query_text = input_data.query.query_text
         max_results = input_data.max_results
+        start_time = time.perf_counter()
 
-        async with aiohttp.ClientSession() as session:
-            # 1. Map to correct retriever adapter
-            if source_type == SourceType.ARXIV:
-                adapter = ArxivAdapter(session)
-            elif source_type == SourceType.SEMANTIC_SCHOLAR:
-                adapter = SemanticScholarAdapter(session)
-            elif source_type == SourceType.PUBMED:
-                adapter = PubMedAdapter(session)
-            elif source_type == SourceType.WIKIPEDIA:
-                adapter = WikipediaAdapter(session)
-            elif source_type == SourceType.GOOGLE_CSE:
-                adapter = GoogleCSEAdapter(session)
-            else:
-                raise ValueError(f"Unsupported source type: {source_type}")
+        try:
+            async with aiohttp.ClientSession() as session:
+                # 1. Map to correct retriever adapter
+                if source_type == SourceType.ARXIV:
+                    adapter = ArxivAdapter(session)
+                elif source_type == SourceType.SEMANTIC_SCHOLAR:
+                    adapter = SemanticScholarAdapter(session)
+                elif source_type == SourceType.PUBMED:
+                    adapter = PubMedAdapter(session)
+                elif source_type == SourceType.WIKIPEDIA:
+                    adapter = WikipediaAdapter(session)
+                elif source_type == SourceType.GOOGLE_CSE:
+                    adapter = GoogleCSEAdapter(session)
+                else:
+                    raise ValueError(f"Unsupported source type: {source_type}")
 
-            # 2. Run retrieval
-            raw_results = await adapter.search(query_text, max_results=max_results)
+                # 2. Run retrieval
+                raw_results = await adapter.search(query_text, max_results=max_results)
 
-            # 3. Enrich metadata (map back to session and query IDs)
-            for res in raw_results:
-                res.session_id = input_data.session_id
-                res.query_id = input_data.query.id
+                # 3. Enrich metadata (map back to session and query IDs)
+                for res in raw_results:
+                    res.session_id = input_data.session_id
+                    res.query_id = input_data.query.id
 
             return ResearchAgentOutput(
                 session_id=input_data.session_id,
+                query=input_data.query,
                 results=raw_results,
+                fetch_duration_ms=int((time.perf_counter() - start_time) * 1000),
+            )
+        except Exception as e:
+            return ResearchAgentOutput(
+                session_id=input_data.session_id,
+                query=input_data.query,
+                results=[],
+                fetch_duration_ms=int((time.perf_counter() - start_time) * 1000),
+                error=str(e),
             )

@@ -33,6 +33,7 @@ class Report(Base):
     limitations: Mapped[str] = mapped_column(Text, nullable=False)
     conclusion: Mapped[str] = mapped_column(Text, nullable=False)
     references: Mapped[list[dict]] = mapped_column(JSONB, default=list, nullable=False)
+    visualization: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     status: Mapped[ReportStatus] = mapped_column(
         Enum(ReportStatus, native_enum=False), default=ReportStatus.DRAFT, nullable=False, index=True
     )

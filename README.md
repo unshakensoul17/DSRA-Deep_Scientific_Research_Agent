@@ -106,3 +106,68 @@ To deploy the entire stack instantly using Docker Compose:
 docker-compose up --build -d
 ```
 Refer to the [Deployment & Operations Guide](docs/deployment.md) for Nginx configuration, SSL termination, and backup details.
+
+
+
+Docker Compose commands you can use to build, start, stop, and debug the DSRA V2 environment.
+
+1. Managing the Entire Stack
+Start all containers in the background (detached mode):
+
+bash
+docker-compose up -d
+(Starts the database dsra_db, backend dsra_backend, and frontend dsra_frontend in the correct dependency order).
+
+Build and start all containers:
+
+bash
+docker-compose up -d --build
+(Forces Docker to rebuild the backend and frontend Dockerfiles before starting).
+
+Stop all running containers:
+
+bash
+docker-compose down
+Stop all containers and remove persistent volumes (e.g. database reset):
+
+bash
+docker-compose down -v
+2. Managing Specific Containers
+If you are only editing frontend or backend code and don't want to rebuild or restart the entire database, you can target specific containers:
+
+Rebuild and restart ONLY the frontend:
+
+bash
+docker-compose up -d --no-deps --build frontend
+Rebuild and restart ONLY the backend:
+
+bash
+docker-compose up -d --no-deps --build backend
+Restart a service without rebuilding:
+
+bash
+docker-compose restart frontend
+3. Monitoring & Logs
+Check the status of all running containers:
+
+bash
+docker ps
+View live logs for the entire stack:
+
+bash
+docker-compose logs -f
+View live logs for a specific service:
+
+bash
+docker-compose logs -f frontend
+# OR
+docker-compose logs -f backend
+4. Database Interaction
+Access the PostgreSQL CLI inside the database container:
+
+bash
+docker exec -it dsra_db psql -U postgres -d dsra_v2
+Run database migrations manually inside the backend container:
+
+bash
+docker exec -it dsra_backend alembic upgrade head

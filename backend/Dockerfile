@@ -10,16 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install poetry
-ENV POETRY_VERSION=1.8.3
-RUN curl -sSL https://install.python-poetry.org | python3 -
-ENV PATH="/root/.local/bin:$PATH"
+COPY requirements.txt ./
 
-COPY pyproject.toml ./
-
-# Disable virtualenvs so poetry installs directly to the global python system site-packages
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-root --no-directory --only main
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Final runtime image
 FROM python:3.12-slim AS runner
@@ -40,13 +33,16 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY app/ /workspace/app/
 COPY migrations/ /workspace/migrations/
 COPY alembic.ini /workspace/alembic.ini
+COPY entrypoint.sh /workspace/entrypoint.sh
 
 # Expose port
 EXPOSE 8000
 
 # Create non-root user for execution
-RUN useradd -u 8888 appuser && chown -R appuser:appuser /workspace
+RUN useradd -u 8888 appuser \
+    && chown -R appuser:appuser /workspace \
+    && chmod +x /workspace/entrypoint.sh
 USER appuser
 
-# Start application using uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start: run migrations then launch uvicorn
+CMD ["/workspace/entrypoint.sh"]

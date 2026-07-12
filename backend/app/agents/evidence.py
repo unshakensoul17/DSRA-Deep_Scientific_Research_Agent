@@ -8,7 +8,8 @@ from typing import ClassVar
 
 from app.agents.base import BaseAgent
 from app.llm.prompts.evidence import evidence_prompt
-from app.schemas.agents.all_agents import EvidenceAgentInput, EvidenceAgentOutput
+from app.schemas.agents.all_agents import EvidenceAgentInput, EvidenceAgentOutput, EvidenceLLMOutput
+from app.schemas.common import EvidencePiece
 
 
 class EvidenceAgent(BaseAgent[EvidenceAgentInput, EvidenceAgentOutput]):
@@ -55,15 +56,29 @@ class EvidenceAgent(BaseAgent[EvidenceAgentInput, EvidenceAgentOutput]):
         ]
 
         # Call gateway for validated Pydantic model response
-        output = await self.llm.get_structured_completion(
+        llm_output = await self.llm.get_structured_completion(
             messages=messages,
-            response_schema=EvidenceAgentOutput,
+            response_schema=EvidenceLLMOutput,
             temperature=0.1,
         )
 
-        # Enforce session id mapping
-        output.session_id = input_data.session_id
-        for ep in output.evidence_pieces:
-            ep.session_id = input_data.session_id
+        output = EvidenceAgentOutput(
+            session_id=input_data.session_id,
+            evidence_pieces=[
+                EvidencePiece(
+                    session_id=input_data.session_id,
+                    claim_text=piece.claim_text,
+                    source_id=piece.source_id,
+                    relevance_score=piece.relevance_score,
+                    excerpt=piece.excerpt,
+                    page_or_section=piece.page_or_section,
+                    iteration=piece.iteration,
+                )
+                for piece in llm_output.evidence_pieces
+            ],
+            source_quality_scores=llm_output.source_quality_scores,
+            deduplication_removed=llm_output.deduplication_removed,
+            total_sources_processed=llm_output.total_sources_processed,
+        )
 
         return output

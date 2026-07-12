@@ -10,7 +10,7 @@ import pytest
 
 from app.agents.export import ExportAgent
 from app.schemas.agents.all_agents import ExportAgentInput, VisualizationBundle
-from app.schemas.common import ReportDraft, ReportSection, ReportReference, SourceType
+from app.schemas.common import ReportDraft, ReportSection, ReportReference, SourceType, ExportFormat
 
 
 @pytest.mark.asyncio
@@ -93,13 +93,12 @@ async def test_export_agent_execution() -> None:
         source_type_distribution={},
     )
 
-    from app.schemas.common import ExportFormat
     agent_input = ExportAgentInput(
         session_id=session_uuid,
         report=report,
         visualization=visualization,
         sources=[],
-        export_formats=[ExportFormat.PDF, ExportFormat.MARKDOWN, ExportFormat.HTML, ExportFormat.JSON]
+        export_formats=[ExportFormat.PDF, ExportFormat.MARKDOWN, ExportFormat.JSON, ExportFormat.HTML]
     )
 
     # 2. Use a temporary directory for tests to avoid writing to local data dir

@@ -6,31 +6,40 @@ import {
   Calendar,
   ShieldCheck,
   BarChart3,
-  Terminal as TerminalIcon,
   Play,
   Download,
   Moon,
   Sun,
   History,
   FolderHeart,
-  Cpu,
   Layers,
-  Award,
   BookMarked
 } from 'lucide-react';
 import { simulateResearch } from './services/mockSSE';
 import type { ReportDraft, VisualizationBundle } from './types';
+import dsraLogo from './assets/logo.jpg';
+import LandingPage from './LandingPage';
+import { AILoader } from './components/AILoader';
 
-// Initial Mock Session History
-const INITIAL_HISTORY = [
-  { id: '1', title: 'CRISPR editing double strand breaks', date: '2026-07-01' },
-  { id: '2', title: 'LNP-mediated mRNA delivery systems', date: '2026-06-28' },
-  { id: '3', title: 'Therapeutic CAR-T cell persistence', date: '2026-06-25' }
-];
+// API Base URL config
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8010';
 
 export default function App() {
+  // Landing page toggle
+  const [showLanding, setShowLanding] = useState(true);
   // Theme control
   const [isLightMode, setIsLightMode] = useState(false);
+
+  // Execution Mode (Simulator vs Live)
+  const mode = 'live';
+  const [token, setToken] = useState<string | null>(localStorage.getItem('dsra_token'));
+  
+  // Auth Form State
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Search Configuration Inputs
   const [topic, setTopic] = useState('CRISPR gene editing therapy double-strand break dynamics');
@@ -47,13 +56,17 @@ export default function App() {
   // Result States
   const [report, setReport] = useState<ReportDraft | null>(null);
   const [visualization, setVisualization] = useState<VisualizationBundle | null>(null);
+  const [claims, setClaims] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'report' | 'graph' | 'timeline' | 'claims' | 'metrics'>('report');
   
+  // Workspace vs Library Mode
+  const [viewMode, setViewMode] = useState<'workspace' | 'library'>('workspace');
+  
   // History and Collections Mock State
-  const [history, setHistory] = useState(INITIAL_HISTORY);
-  const [savedReports] = useState<string[]>(['CRISPR editing double strand breaks']);
+  const [history, setHistory] = useState<any[]>([]);
+  const [savedReports] = useState<string[]>([]);
 
-  const terminalEndRef = useRef<HTMLDivElement>(null);
+  const terminalContainerRef = useRef<HTMLDivElement>(null);
 
   // Toggle Theme Helper
   const toggleTheme = () => {
@@ -63,13 +76,312 @@ export default function App() {
 
   // Scroll to bottom of terminal
   useEffect(() => {
-    if (terminalEndRef.current) {
-      terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (terminalContainerRef.current) {
+      terminalContainerRef.current.scrollTop = terminalContainerRef.current.scrollHeight;
     }
   }, [logs]);
 
-  // Execute simulation flow
+  // Load live history on mount if token exists
+  useEffect(() => {
+    if (mode === 'live' && token) {
+      fetchLiveHistory(token);
+    }
+  }, [mode, token]);
+
+  // Fetch session history from Neon PostgreSQL backend
+  const fetchLiveHistory = async (authToken: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/sessions`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = data.map((s: any) => ({
+          id: s.session_id,
+          title: s.topic,
+          date: s.created_at.split('T')[0]
+        }));
+        setHistory(mapped);
+      } else if (res.status === 401) {
+        localStorage.removeItem('dsra_token');
+        setToken(null);
+        setHistory([]);
+      }
+    } catch (e) {
+      console.error('Failed to fetch history:', e);
+    }
+  };
+
+  // Fetch report details
+  const fetchFinalReport = async (reportId: string, authToken: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/reports/${reportId}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to load final report details.`);
+      }
+      const finalReport = await res.json();
+      setReport(finalReport);
+      if (finalReport.visualization) {
+        setVisualization(finalReport.visualization);
+      }
+      
+      // Fetch dynamic claims if session_id is available
+      if (finalReport.session_id) {
+        try {
+          const claimsRes = await fetch(`${API_BASE_URL}/api/v1/sessions/${finalReport.session_id}/claims`, {
+            headers: {
+              'Authorization': `Bearer ${authToken}`
+            }
+          });
+          if (claimsRes.ok) {
+            const claimsData = await claimsRes.json();
+            setClaims(claimsData);
+          }
+        } catch (claimsErr) {
+          console.error("Failed to load session claims:", claimsErr);
+        }
+      }
+
+      setIsRunning(false);
+      setCurrentAgent(null);
+      await fetchLiveHistory(authToken);
+    } catch (err: any) {
+      setLogs(prev => [...prev, `[Error] ${err.message}`]);
+      setIsRunning(false);
+    }
+  };
+
+  // Login handler
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: authEmail,
+          password: authPassword
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'Authentication failed');
+      }
+
+      localStorage.setItem('dsra_token', data.access_token);
+      setToken(data.access_token);
+      setShowLoginModal(false);
+      setAuthEmail('');
+      setAuthPassword('');
+      fetchLiveHistory(data.access_token);
+    } catch (err: any) {
+      setAuthError(err.message || 'Login failed');
+    }
+  };
+
+  // Registration handler
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: authEmail,
+          password: authPassword
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'Registration failed');
+      }
+
+      const loginRes = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: authEmail,
+          password: authPassword
+        })
+      });
+
+      const loginData = await loginRes.json();
+      if (!loginRes.ok) {
+        throw new Error('Registration succeeded, but auto-login failed');
+      }
+
+      localStorage.setItem('dsra_token', loginData.access_token);
+      setToken(loginData.access_token);
+      setShowLoginModal(false);
+      setAuthEmail('');
+      setAuthPassword('');
+      fetchLiveHistory(loginData.access_token);
+    } catch (err: any) {
+      setAuthError(err.message || 'Registration failed');
+    }
+  };
+
+  // Execute Live Research Pipeline
+  const handleStartResearchLive = async () => {
+    const activeToken = localStorage.getItem('dsra_token');
+    if (!activeToken) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    setIsRunning(true);
+    setLogs([]);
+    setCurrentAgent('PlannerAgent');
+    setCompletedAgents([]);
+    setReport(null);
+    setVisualization(null);
+    setClaims([]);
+
+    const logLine = (msg: string) => {
+      const stamp = new Date().toLocaleTimeString();
+      setLogs(prev => [...prev, `[${stamp}] ${msg}`]);
+    };
+
+    logLine(`Initializing Live Research Session...`);
+
+    try {
+      const createRes = await fetch(`${API_BASE_URL}/api/v1/sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${activeToken}`
+        },
+        body: JSON.stringify({
+          topic: topic,
+          depth: depth,
+          max_iterations: maxIterations,
+          max_sources_per_query: 10,
+          source_preferences: ['arxiv', 'semantic_scholar', 'wikipedia']
+        })
+      });
+
+      if (createRes.status === 401) {
+        logLine(`❌ Session creation failed: Unauthorized. Please log in.`);
+        setIsRunning(false);
+        setShowLoginModal(true);
+        return;
+      }
+
+      if (!createRes.ok) {
+        const errData = await createRes.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Failed to create session');
+      }
+
+      const sessionData = await createRes.json();
+      const sessionId = sessionData.session_id;
+      logLine(`Created research workspace session: ${sessionId}`);
+
+      const startRes = await fetch(`${API_BASE_URL}/api/v1/sessions/${sessionId}/start`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${activeToken}`
+        }
+      });
+
+      if (!startRes.ok) {
+        const errData = await startRes.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Failed to start session');
+      }
+
+      logLine(`Orchestrator job submitted in background. Subscribing to telemetry stream...`);
+
+      const streamUrl = `${API_BASE_URL}/api/v1/sessions/${sessionId}/stream`;
+      const response = await fetch(streamUrl, {
+        headers: {
+          'Authorization': `Bearer ${activeToken}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to connect to stream: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Readable stream not supported by browser.');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let currentEvent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          if (trimmed.startsWith('event:')) {
+            currentEvent = trimmed.replace('event:', '').trim();
+          } else if (trimmed.startsWith('data:')) {
+            const dataStr = trimmed.replace('data:', '').trim();
+            try {
+              const payload = JSON.parse(dataStr);
+              if (currentEvent === 'agent_started') {
+                setCurrentAgent(payload.agent);
+                logLine(`⚡ Agent Started: ${payload.agent}`);
+              } else if (currentEvent === 'agent_completed') {
+                setCompletedAgents(prev => [...prev, payload.agent]);
+                logLine(`✅ Agent Completed: ${payload.agent} (took ${payload.duration_ms}ms)`);
+              } else if (currentEvent === 'agent_failed') {
+                logLine(`❌ Agent Failed: ${payload.agent}. Error: ${payload.error}`);
+              } else if (currentEvent === 'session_state_changed') {
+                logLine(`Transition state: ${payload.current_state} ➡️ ${payload.target_state}`);
+              } else if (currentEvent === 'research_complete') {
+                logLine(`🏁 Research completed. Finalizing draft...`);
+                await fetchFinalReport(payload.report_id, activeToken);
+              } else if (currentEvent === 'error') {
+                logLine(`❌ Pipeline error: ${payload.message}`);
+                setIsRunning(false);
+              } else if (payload.message) {
+                logLine(payload.message);
+              }
+            } catch (e) {
+              console.error('Error parsing SSE event data:', dataStr, e);
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      logLine(`❌ Error: ${err.message || err}`);
+      setIsRunning(false);
+    }
+  };
+
+  // Main start handler (routes based on mode)
   const handleStartResearch = () => {
+    if (mode === 'live') {
+      handleStartResearchLive();
+      return;
+    }
+
     if (!topic.trim()) return;
 
     setIsRunning(true);
@@ -78,6 +390,7 @@ export default function App() {
     setCompletedAgents([]);
     setReport(null);
     setVisualization(null);
+    setClaims([]);
 
     const logLine = (msg: string) => {
       const stamp = new Date().toLocaleTimeString();
@@ -119,14 +432,8 @@ export default function App() {
     );
   };
 
-  // Preset configuration selection
-  const selectHistorySession = (title: string) => {
-    setTopic(title);
-    // Directly prefill results to show interactive details instantly
-    setLogs([
-      `[History] Loaded cached session metadata for "${title}".`,
-      `[History] Visual bundle retrieved.`
-    ]);
+  // Preset configuration selection (Mock)
+  const selectHistorySessionMock = (title: string) => {
     const mockReport = {
       id: 'f93d39db-10b2-4d92-bbff-3cd3558ffb41',
       session_id: 'a98b776c-d221-4f81-9988-bb735511aa22',
@@ -202,39 +509,116 @@ export default function App() {
         'Semantic Scholar': 20
       }
     };
-
+ 
     setReport(mockReport);
     setVisualization(mockViz);
     setCompletedAgents(['PlannerAgent', 'ResearchAgent', 'EvidenceAgent', 'VerificationAgent', 'GapAnalysisAgent', 'WriterAgent', 'CriticAgent', 'VisualizationAgent', 'ExportAgent']);
   };
 
-  // Mock Export package trigger
-  const triggerExport = (fmt: string) => {
-    alert(`Generating download package: report.${fmt.toLowerCase()} has been exported to local system folder.`);
+  // Main history / saved items selector
+  const selectHistorySession = async (item: string | { id: string; title: string; date: string }) => {
+    setViewMode('workspace');
+    const title = typeof item === 'string' ? item : item.title;
+    setTopic(title);
+
+    if (typeof item === 'string' || item.id === 'saved') {
+      setLogs([
+        `[History] Loaded cached session metadata for "${title}".`,
+        `[History] Visual bundle retrieved.`
+      ]);
+      selectHistorySessionMock(title);
+      return;
+    }
+
+    const activeToken = localStorage.getItem('dsra_token');
+    if (!activeToken) return;
+
+    setLogs([`[History] Loading session ${item.id}...`]);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/sessions/${item.id}`, {
+        headers: {
+          'Authorization': `Bearer ${activeToken}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to load session details');
+      const data = await res.json();
+      
+      setLogs(prev => [...prev, `[History] Session state: ${data.state}`]);
+      setCurrentAgent(null);
+      if (data.agent_timeline) {
+        setCompletedAgents(data.agent_timeline.map((item: any) => item.agent));
+      } else {
+        setCompletedAgents([]);
+      }
+      
+      if (data.report_id) {
+        await fetchFinalReport(data.report_id, activeToken);
+      } else {
+        setReport(null);
+        setVisualization(null);
+        setClaims([]);
+        setLogs(prev => [...prev, `[History] No report compiled for this session yet.`]);
+      }
+    } catch (e: any) {
+      setLogs(prev => [...prev, `[History Error] ${e.message}`]);
+    }
   };
+
+  // Trigger Export download
+  const triggerExport = (fmt: string) => {
+    if (!report) {
+      alert("No report available to export.");
+      return;
+    }
+    const currentToken = token || localStorage.getItem('dsra_token');
+    if (!currentToken) {
+      alert("You must be logged in to export reports.");
+      return;
+    }
+    const url = `${API_BASE_URL}/api/v1/sessions/${report.session_id}/download/${fmt.toLowerCase()}?token=${currentToken}`;
+    window.open(url, '_blank');
+  };
+
+  if (showLanding) {
+    return <LandingPage onStart={() => setShowLanding(false)} />;
+  }
 
   return (
     <div className="app-container">
+      <div className="glow-orb glow-orb-1" />
+      <div className="glow-orb glow-orb-2" />
       {/* Sidebar Navigation */}
       <aside className="sidebar">
         <div className="sidebar-header">
-          <Cpu size={24} className="icon-logo" style={{ color: '#6366f1' }} />
+          <img src={dsraLogo} alt="DSRA Logo" className="brand-logo" />
           <span className="sidebar-logo">DSRA V2</span>
         </div>
 
         <div className="sidebar-menu">
+          {/* Library Button */}
+          {token && (
+            <div 
+              className={`menu-item ${viewMode === 'library' ? 'active' : ''}`} 
+              onClick={() => setViewMode('library')}
+              style={{ marginBottom: '16px', background: viewMode === 'library' ? 'var(--primary)' : 'rgba(255,255,255,0.05)', color: viewMode === 'library' ? '#fff' : 'inherit', border: '1px solid rgba(255,255,255,0.1)' }}
+            >
+              <FolderHeart size={14} />
+              <span style={{ fontWeight: 600 }}>My Library</span>
+            </div>
+          )}
+
           {/* History section */}
           <div className="menu-section-title">
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <History size={12} />
-              <span>Research History</span>
+              <span>Recent Research</span>
             </div>
           </div>
           {history.map(item => (
             <div
               key={item.id}
               className={`menu-item ${topic === item.title ? 'active' : ''}`}
-              onClick={() => selectHistorySession(item.title)}
+              onClick={() => selectHistorySession(item)}
             >
               <BookOpen size={14} />
               <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -257,22 +641,92 @@ export default function App() {
               <span>{saved}</span>
             </div>
           ))}
+
         </div>
 
-        <div className="sidebar-footer">
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>v2.0.0 Stable</span>
-          <button className="btn-secondary" onClick={toggleTheme} style={{ padding: '6px 10px' }}>
-            {isLightMode ? <Moon size={14} /> : <Sun size={14} />}
-          </button>
+        <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px', borderTop: '1px solid var(--border)' }}>
+          {token ? (
+            <button 
+              className="btn-secondary" 
+              onClick={() => {
+                localStorage.removeItem('dsra_token');
+                setToken(null);
+                setHistory([]);
+              }}
+              style={{ fontSize: '12px', padding: '8px', width: '100%', justifyContent: 'center' }}
+            >
+              Sign Out
+            </button>
+          ) : (
+            <button 
+              className="btn-primary" 
+              onClick={() => setShowLoginModal(true)}
+              style={{ fontSize: '12px', padding: '8px', width: '100%', justifyContent: 'center' }}
+            >
+              Sign In / Register
+            </button>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '4px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>v2.0.0 Stable</span>
+            <button className="btn-secondary" onClick={toggleTheme} style={{ padding: '6px 10px' }}>
+              {isLightMode ? <Moon size={14} /> : <Sun size={14} />}
+            </button>
+          </div>
         </div>
       </aside>
 
       {/* Main Workspace Layout */}
-      <main className="workspace">
+      <main className="workspace" style={{ padding: viewMode === 'library' ? '30px' : '20px', overflowY: 'auto' }}>
         
-        {/* Left Side: Control Board and SSE timeline */}
-        <section className="control-panel">
-          <div className="glass-card">
+        {viewMode === 'library' ? (
+          <div className="library-view animate-fade-in">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <div>
+                <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>My Research Library</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Your isolated workspace containing all your past AI-generated research reports.</p>
+              </div>
+              <button className="btn-primary" onClick={() => { setTopic(''); setReport(null); setViewMode('workspace'); }}>
+                <Search size={16} /> New Research
+              </button>
+            </div>
+            
+            {history.length === 0 ? (
+              <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 20px', textAlign: 'center', opacity: 0.7 }}>
+                <FolderHeart size={48} style={{ marginBottom: '16px', color: 'var(--text-muted)' }} />
+                <h3>No Research Found</h3>
+                <p style={{ fontSize: '14px', marginTop: '8px' }}>Your library is currently empty. Start a new deep analysis to populate your environment.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+                {history.map(item => (
+                  <div key={item.id} className="glass-card" style={{ padding: '20px', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', position: 'relative', overflow: 'hidden' }} onClick={() => selectHistorySession(item)}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 10px 25px rgba(0,0,0,0.2)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+                  >
+                    <div style={{ position: 'absolute', top: '-10px', right: '-10px', width: '40px', height: '40px', background: 'var(--primary)', opacity: 0.1, borderRadius: '50%', filter: 'blur(10px)' }}></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                      <BookOpen size={16} style={{ color: 'var(--primary)' }} />
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600 }}>REPORT</span>
+                    </div>
+                    <h4 style={{ fontSize: '16px', fontWeight: 600, lineHeight: 1.4, marginBottom: '16px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {item.title}
+                    </h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '12px', marginTop: 'auto' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '12px' }}>
+                        <Calendar size={12} /> {item.date}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 500 }}>View &rarr;</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Left Side: Control Board and SSE timeline */}
+            <section className="control-panel">
+              <div className="glass-card">
             <h3 style={{ marginBottom: '14px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Search size={16} style={{ color: '#14b8a6' }} />
               <span>Research configuration</span>
@@ -283,7 +737,7 @@ export default function App() {
               <label className="form-label">Research Topic / Hypothesis</label>
               <textarea
                 className="form-input"
-                style={{ height: '70px', resize: 'none' }}
+                style={{ height: '52px', resize: 'none' }}
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 disabled={isRunning}
@@ -350,14 +804,14 @@ export default function App() {
           </div>
 
           {/* Stepper Timeline & Live Agent Status */}
-          <div className="glass-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minHeight: '380px' }}>
+          <div className="glass-card pipeline-card">
             <h3 style={{ fontSize: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Layers size={14} style={{ color: '#6366f1' }} />
               <span>Orchestrator pipeline state</span>
             </h3>
 
-            {/* Stepper list */}
-            <div className="timeline-container">
+            <div className="stepper-scroll-container">
+              <div className="timeline-container">
               {[
                 { name: 'PlannerAgent', label: 'Plan & Formulate Blueprints' },
                 { name: 'ResearchAgent', label: 'Academic Search & Retrieval' },
@@ -387,23 +841,7 @@ export default function App() {
                 );
               })}
             </div>
-
-            {/* SSE Terminal Console Output */}
-            <div className="terminal-card">
-              <div className="terminal-header">
-                <span className="terminal-title">Console logs</span>
-                <TerminalIcon size={12} style={{ color: 'var(--text-muted)' }} />
-              </div>
-              <div className="terminal-body">
-                {logs.length === 0 && (
-                  <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Terminal idle. Submit a query to trigger pipeline logs.</span>
-                )}
-                {logs.map((log, i) => (
-                  <div key={i} className="terminal-line">{log}</div>
-                ))}
-                <div ref={terminalEndRef} />
-              </div>
-            </div>
+          </div>
           </div>
         </section>
 
@@ -411,44 +849,44 @@ export default function App() {
         <section className="content-viewer">
           {/* Header tabs controls */}
           <div className="tabs-header">
-            <nav className="tabs-list">
+            <nav className="tabs-list-pill">
               <button
-                className={`tab-btn ${activeTab === 'report' ? 'active' : ''}`}
+                className={`tab-btn-pill ${activeTab === 'report' ? 'active' : ''}`}
                 onClick={() => setActiveTab('report')}
               >
-                <BookOpen size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
+                <BookOpen size={15} />
                 <span>Research Report</span>
               </button>
               <button
-                className={`tab-btn ${activeTab === 'graph' ? 'active' : ''}`}
+                className={`tab-btn-pill ${activeTab === 'graph' ? 'active' : ''}`}
                 onClick={() => setActiveTab('graph')}
                 disabled={!visualization}
               >
-                <GitBranch size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
+                <GitBranch size={15} />
                 <span>Knowledge Graph</span>
               </button>
               <button
-                className={`tab-btn ${activeTab === 'timeline' ? 'active' : ''}`}
+                className={`tab-btn-pill ${activeTab === 'timeline' ? 'active' : ''}`}
                 onClick={() => setActiveTab('timeline')}
                 disabled={!visualization}
               >
-                <Calendar size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
+                <Calendar size={15} />
                 <span>Timeline</span>
               </button>
               <button
-                className={`tab-btn ${activeTab === 'claims' ? 'active' : ''}`}
+                className={`tab-btn-pill ${activeTab === 'claims' ? 'active' : ''}`}
                 onClick={() => setActiveTab('claims')}
                 disabled={!report}
               >
-                <ShieldCheck size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
+                <ShieldCheck size={15} />
                 <span>Claims & Citations</span>
               </button>
               <button
-                className={`tab-btn ${activeTab === 'metrics' ? 'active' : ''}`}
+                className={`tab-btn-pill ${activeTab === 'metrics' ? 'active' : ''}`}
                 onClick={() => setActiveTab('metrics')}
                 disabled={!visualization}
               >
-                <BarChart3 size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
+                <BarChart3 size={15} />
                 <span>Metrics</span>
               </button>
             </nav>
@@ -462,11 +900,23 @@ export default function App() {
                 </button>
                 <button className="btn-secondary" onClick={() => triggerExport('MD')}>
                   <Download size={14} />
-                  <span>Markdown</span>
+                  <span>MD</span>
+                </button>
+                <button className="btn-secondary" onClick={() => triggerExport('HTML')}>
+                  <Download size={14} />
+                  <span>HTML</span>
                 </button>
                 <button className="btn-secondary" onClick={() => triggerExport('JSON')}>
                   <Download size={14} />
                   <span>JSON</span>
+                </button>
+                <button className="btn-secondary" onClick={() => triggerExport('DOCX')}>
+                  <Download size={14} />
+                  <span>DOCX</span>
+                </button>
+                <button className="btn-secondary" onClick={() => triggerExport('ZIP')}>
+                  <Download size={14} />
+                  <span>ZIP</span>
                 </button>
               </div>
             )}
@@ -478,7 +928,7 @@ export default function App() {
             {/* If no report is loaded yet */}
             {!report && !isRunning && (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: 'var(--text-muted)', gap: '16px' }}>
-                <Cpu size={48} style={{ color: 'var(--scrollbar-thumb)' }} />
+                <img src={dsraLogo} alt="DSRA Logo" style={{ width: '96px', height: '96px', borderRadius: '16px', objectFit: 'cover', boxShadow: '0 0 25px rgba(99, 102, 241, 0.4)', marginBottom: '8px' }} />
                 <h4 style={{ fontSize: '18px', fontWeight: 500 }}>No Research Session Loaded</h4>
                 <p style={{ maxWidth: '340px', fontSize: '13px', textAlign: 'center' }}>
                   Select an item from history or enter a topic hypothesis to run the full deep research sequence.
@@ -488,15 +938,8 @@ export default function App() {
 
             {/* Running loader */}
             {isRunning && !report && (
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: 'var(--text-muted)', gap: '16px' }}>
-                <div style={{ width: '40px', height: '40px', border: '3px solid var(--border)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                <h4 style={{ fontSize: '16px', fontWeight: 500, color: 'var(--text-main)' }}>Pipeline Active: {currentAgent}</h4>
-                <p style={{ fontSize: '12px' }}>Synthesizing literature resources. Please wait...</p>
-                <style>{`
-                  @keyframes spin {
-                    to { transform: rotate(360deg); }
-                  }
-                `}</style>
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: 'var(--text-muted)' }}>
+                <AILoader currentAgent={currentAgent} />
               </div>
             )}
 
@@ -579,54 +1022,57 @@ export default function App() {
             {/* Tab: Knowledge Graph */}
             {visualization && activeTab === 'graph' && (
               <div>
-                <h3 style={{ marginBottom: '16px' }}>Dynamic Concept Knowledge Network</h3>
+                <h3 className="graph-title">Dynamic Concept Knowledge Network</h3>
+                <p className="graph-subtitle">Aggregated conceptual relationship nodes extracted across published literature databases</p>
                 <div className="graph-container">
-                  {/* SVG Nodes and Links representation */}
-                  <svg width="100%" height="100%" viewBox="0 0 600 400">
+                  <svg width="100%" height="400">
                     <defs>
-                      <marker id="arrow" viewBox="0 0 10 10" refX="18" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--text-muted)" />
+                      <marker id="arrow" viewBox="0 0 10 10" refX="24" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--border)" />
                       </marker>
+                      <linearGradient id="grad-indigo" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#818cf8" />
+                        <stop offset="100%" stopColor="#4f46e5" />
+                      </linearGradient>
                     </defs>
-
-                    {/* Hardcoded interactive SVG node positions for clean layout */}
-                    {/* Edges */}
-                    <line x1="300" y1="80" x2="180" y2="180" stroke="var(--border)" strokeWidth="1.5" className="edge-line" markerEnd="url(#arrow)" />
-                    <line x1="180" y1="180" x2="100" y2="280" stroke="var(--border)" strokeWidth="1.5" className="edge-line" markerEnd="url(#arrow)" />
-                    <line x1="180" y1="180" x2="260" y2="280" stroke="var(--border)" strokeWidth="1.5" className="edge-line" markerEnd="url(#arrow)" />
-                    <line x1="300" y1="80" x2="420" y2="180" stroke="var(--border)" strokeWidth="1.5" className="edge-line" markerEnd="url(#arrow)" />
-                    <line x1="480" y1="280" x2="420" y2="180" stroke="var(--border)" strokeWidth="1.5" className="edge-line" markerEnd="url(#arrow)" />
-
-                    {/* Nodes & Labels */}
-                    <g transform="translate(300, 80)">
-                      <circle r="22" fill="#6366f1" className="node-circle" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-                      <text dy="32" textAnchor="middle" fill="var(--text-main)" fontSize="11" fontWeight="700">CRISPR-Cas9</text>
-                    </g>
-
-                    <g transform="translate(180, 180)">
-                      <circle r="18" fill="#ec4899" className="node-circle" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-                      <text dy="28" textAnchor="middle" fill="var(--text-main)" fontSize="11" fontWeight="700">Double Strand Breaks</text>
-                    </g>
-
-                    <g transform="translate(100, 280)">
-                      <circle r="16" fill="#14b8a6" className="node-circle" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-                      <text dy="26" textAnchor="middle" fill="var(--text-main)" fontSize="11" fontWeight="700">NHEJ Repair</text>
-                    </g>
-
-                    <g transform="translate(260, 280)">
-                      <circle r="16" fill="#14b8a6" className="node-circle" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-                      <text dy="26" textAnchor="middle" fill="var(--text-main)" fontSize="11" fontWeight="700">HDR Repair</text>
-                    </g>
-
-                    <g transform="translate(420, 180)">
-                      <circle r="18" fill="#f59e0b" className="node-circle" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-                      <text dy="28" textAnchor="middle" fill="var(--text-main)" fontSize="11" fontWeight="700">Off-Target Mutations</text>
-                    </g>
-
-                    <g transform="translate(480, 280)">
-                      <circle r="16" fill="#10b981" className="node-circle" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-                      <text dy="26" textAnchor="middle" fill="var(--text-main)" fontSize="11" fontWeight="700">HiFi Nucleases</text>
-                    </g>
+                    {(() => {
+                       const centerX = 300;
+                       const centerY = 200;
+                       const radius = 120;
+                       const nodes = visualization.knowledge_nodes || [];
+                       const edges = visualization.knowledge_edges || [];
+                       
+                       const positionedNodes = nodes.map((node, i) => {
+                         const angle = (i / (nodes.length || 1)) * 2 * Math.PI;
+                         return {
+                           ...node,
+                           x: centerX + radius * Math.cos(angle),
+                           y: centerY + radius * Math.sin(angle)
+                         };
+                       });
+                       const nodeMap = new Map(positionedNodes.map(n => [n.id, n]));
+                       
+                       return (
+                         <>
+                           {edges.map((edge, idx) => {
+                             const source = nodeMap.get(edge.source);
+                             const target = nodeMap.get(edge.target);
+                             if (!source || !target) return null;
+                             return (
+                               <line key={`e-${idx}`} x1={source.x} y1={source.y} x2={target.x} y2={target.y} stroke="var(--border)" strokeWidth="1.5" className="edge-line" markerEnd="url(#arrow)" />
+                             );
+                           })}
+                           {positionedNodes.map((node, idx) => (
+                             <g key={`n-${idx}`} transform={`translate(${node.x}, ${node.y})`}>
+                               <circle r="22" fill="url(#grad-indigo)" className="node-circle" stroke="rgba(255,255,255,0.3)" strokeWidth="2" />
+                               <text dy="32" textAnchor="middle" fill="var(--text-main)" fontSize="11" fontWeight="700" style={{ letterSpacing: '0.02em' }}>
+                                 {node.label}
+                               </text>
+                             </g>
+                           ))}
+                         </>
+                       );
+                    })()}
                   </svg>
                 </div>
                 
@@ -660,54 +1106,59 @@ export default function App() {
             {/* Tab: Timeline */}
             {visualization && activeTab === 'timeline' && (
               <div>
-                <h3 style={{ marginBottom: '20px' }}>Historical Evolution & Clinical Translation Milestones</h3>
+                <h3 style={{ marginBottom: '24px', fontSize: '20px', fontWeight: 700 }}>Historical Evolution & Clinical Translation Milestones</h3>
                 <div className="timeline-card-list">
                   {visualization.timeline.map((event, idx) => (
                     <div key={idx} className="timeline-event-card">
-                      <span className="timeline-event-year">{event.year}</span>
-                      <h4 style={{ fontSize: '15px', fontWeight: 700 }}>{event.event}</h4>
-                      <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>{event.description}</p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="timeline-event-year">{event.year}</span>
+                        <span style={{ fontSize: '10px', background: 'rgba(20, 184, 166, 0.12)', color: 'var(--secondary)', padding: '2px 8px', borderRadius: '10px', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>STAGE 0{idx + 1}</span>
+                      </div>
+                      <h4 style={{ fontSize: '16px', fontWeight: 700, marginTop: '4px' }}>
+                        {event.significance === 'HIGH' ? 'Critical Milestone' : 'Development Milestone'}
+                      </h4>
+                      <p style={{ fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: '1.6', marginTop: '4px' }}>{event.event}</p>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-
             {/* Tab: Claims & Citations */}
             {report && activeTab === 'claims' && (
               <div>
                 <h3 style={{ marginBottom: '20px' }}>Factual Claim Verification Log</h3>
                 <div className="claims-grid">
-                  {[
-                    { id: 'c1', claim: 'CRISPR editors achieve over 90% target mutation correction in targeted cell lineages.', confidence: 'High (>0.85)', status: 'high' },
-                    { id: 'c2', claim: 'Off-target mutations can trigger translocation and rearrangements.', confidence: 'High (>0.85)', status: 'high' },
-                    { id: 'c3', claim: 'Double strand breaks are processed primarily via NHEJ and HDR pathways.', confidence: 'High (>0.85)', status: 'high' },
-                    { id: 'c4', claim: 'In-vivo Cas9 delivery shows zero systemic toxicity in early cohorts.', confidence: 'Medium (0.60-0.85)', status: 'medium' },
-                    { id: 'c5', claim: 'HiFi Cas9 variants decrease off-target sequence cleavages by 85%.', confidence: 'High (>0.85)', status: 'high' },
-                    { id: 'c6', claim: 'Transient editor exposure limits overall mutation potential.', confidence: 'Medium (0.60-0.85)', status: 'medium' }
-                  ].map((item, idx) => (
-                    <div key={idx} className="claim-item">
-                      <div className="claim-header">
-                        <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>Claim ID: {item.id}</span>
-                        <span className={`claim-confidence-badge ${item.status}`}>{item.confidence}</span>
-                      </div>
-                      <p style={{ fontSize: '13px', lineHeight: '1.5', marginBottom: '8px' }}>{item.claim}</p>
-                      
-                      <div style={{ borderTop: '1px solid var(--border)', paddingTop: '8px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Supporting Sources:</span>
-                        <div className="claim-citation-list">
-                          <span className="citation-chip">
-                            <Award size={10} />
-                            <span>Frangoul2021 (PubMed)</span>
-                          </span>
-                          <span className="citation-chip">
-                            <Award size={10} />
-                            <span>Doudna2020 (Semantic Scholar)</span>
+                  {claims && claims.length > 0 ? (
+                    claims.map((claim) => (
+                      <div key={claim.id} className="claim-item">
+                        <div className="claim-header">
+                          <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>Claim ID: {claim.id.slice(0, 8)}</span>
+                          <span className={`claim-confidence-badge ${claim.confidence >= 0.85 ? 'high' : claim.confidence >= 0.5 ? 'medium' : 'low'}`}>
+                            {claim.status} ({claim.confidence.toFixed(2)})
                           </span>
                         </div>
+                        <p style={{ fontSize: '13px', lineHeight: '1.5', marginBottom: '8px' }}>{claim.text}</p>
+                        {claim.source_ids && claim.source_ids.length > 0 && (
+                          <div style={{ marginTop: '8px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                            <strong>Linked Sources:</strong> {claim.source_ids.map((sid: string) => sid.slice(0, 8)).join(', ')}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    (report.key_findings || []).map((finding, idx) => {
+                      const id = `c${idx+1}`;
+                      return (
+                        <div key={id} className="claim-item">
+                          <div className="claim-header">
+                            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>Claim ID: {id}</span>
+                            <span className={`claim-confidence-badge high`}>High (&gt;0.85)</span>
+                          </div>
+                          <p style={{ fontSize: '13px', lineHeight: '1.5', marginBottom: '8px' }}>{finding}</p>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}
@@ -724,7 +1175,7 @@ export default function App() {
                       Claim Confidence Distribution
                     </h4>
                     <div className="dist-bars">
-                      {Object.entries(visualization.confidence_distribution).map(([label, val], idx) => (
+                      {Object.entries(visualization.confidence_distribution || {}).map(([label, val], idx) => (
                         <div key={idx} className="dist-bar-item">
                           <div className="dist-bar-header">
                             <span>{label}</span>
@@ -744,7 +1195,7 @@ export default function App() {
                       Source Citation Type Distribution
                     </h4>
                     <div className="dist-bars">
-                      {Object.entries(visualization.source_type_distribution).map(([label, val], idx) => (
+                      {Object.entries(visualization.source_type_distribution || {}).map(([label, val], idx) => (
                         <div key={idx} className="dist-bar-item">
                           <div className="dist-bar-header">
                             <span>{label}</span>
@@ -762,7 +1213,7 @@ export default function App() {
                 <div className="glass-card" style={{ marginTop: '24px' }}>
                   <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>System Audit Verdict</h4>
                   <p style={{ fontSize: '13px', lineHeight: '1.5', color: 'var(--text-muted)' }}>
-                    The report has been graded with a confidence score of <strong>8.8 / 10</strong>. Content coverage 
+                    The report has been graded with a confidence score of <strong>{report ? (report.critique_score || 0).toFixed(1) : '0.0'} / 10</strong>. Content coverage 
                     fully satisfies the target threshold of <strong>{(coverageThreshold * 100).toFixed(0)}%</strong>. No contradictory 
                     excerpts were found in the selected publication corpus.
                   </p>
@@ -772,8 +1223,82 @@ export default function App() {
 
           </div>
         </section>
-
+        </>
+        )}
       </main>
+
+      {/* Login Modal Overlay */}
+      {showLoginModal && (
+        <div className="modal-overlay">
+          <div className="login-modal">
+            <h3 style={{ fontSize: '18px', textAlign: 'center', color: 'var(--primary)' }}>
+              {isRegistering ? 'Create Academic Account' : 'Authenticate Workspace'}
+            </h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '-10px' }}>
+              Connect to your Neon DB & Render backend session broker
+            </p>
+            
+            <form onSubmit={isRegistering ? handleRegister : handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="form-group">
+                <label className="form-label">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  className="form-input"
+                  placeholder="name@university.edu"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Password</label>
+                <input
+                  type="password"
+                  required
+                  className="form-input"
+                  placeholder="••••••••"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                />
+              </div>
+              
+              {authError && (
+                <div style={{ color: 'var(--accent-pink)', fontSize: '12px', textAlign: 'center' }}>
+                  {authError}
+                </div>
+              )}
+              
+              <button type="submit" className="btn-primary" style={{ marginTop: '10px' }}>
+                {isRegistering ? 'Sign Up' : 'Sign In'}
+              </button>
+            </form>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '10px' }}>
+              <button 
+                className="btn-secondary" 
+                onClick={() => {
+                  setIsRegistering(!isRegistering);
+                  setAuthError(null);
+                }}
+                style={{ padding: '4px 8px', border: 'none', background: 'transparent' }}
+              >
+                {isRegistering ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
+              </button>
+              
+              <button 
+                className="btn-secondary" 
+                onClick={() => {
+                  setShowLoginModal(false);
+                  setAuthError(null);
+                }}
+                style={{ padding: '4px 8px', border: 'none', background: 'transparent', color: 'var(--text-muted)' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

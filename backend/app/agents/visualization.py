@@ -8,7 +8,11 @@ from typing import ClassVar
 
 from app.agents.base import BaseAgent
 from app.llm.prompts.visualization import visualization_prompt
-from app.schemas.agents.all_agents import VisualizationAgentInput, VisualizationBundle
+from app.schemas.agents.all_agents import (
+    VisualizationAgentInput,
+    VisualizationBundle,
+    VisualizationLLMOutput,
+)
 
 
 class VisualizationAgent(BaseAgent[VisualizationAgentInput, VisualizationBundle]):
@@ -48,14 +52,20 @@ class VisualizationAgent(BaseAgent[VisualizationAgentInput, VisualizationBundle]
             {"role": "user", "content": user_content},
         ]
 
-        # Call gateway for validated Pydantic model response
-        output = await self.llm.get_structured_completion(
+        # Call gateway with LLM-facing schema (no runtime session_id)
+        llm_output = await self.llm.get_structured_completion(
             messages=messages,
-            response_schema=VisualizationBundle,
+            response_schema=VisualizationLLMOutput,
             temperature=0.1,
         )
 
-        # Enforce consistent session UUID
-        output.session_id = input_data.session_id
-
-        return output
+        # Assemble runtime VisualizationBundle with correct session_id
+        return VisualizationBundle(
+            session_id=input_data.session_id,
+            tables=llm_output.tables,
+            timeline=llm_output.timeline,
+            knowledge_nodes=llm_output.knowledge_nodes,
+            knowledge_edges=llm_output.knowledge_edges,
+            confidence_distribution=llm_output.confidence_distribution,
+            source_type_distribution=llm_output.source_type_distribution,
+        )

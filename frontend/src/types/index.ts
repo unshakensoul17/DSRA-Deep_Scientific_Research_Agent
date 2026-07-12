@@ -23,6 +23,7 @@ export interface ReportDraft {
   methodology_description: string;
   limitations: string;
   conclusion: string;
+  critique_score?: number;
 }
 
 export interface TableBundle {
@@ -34,8 +35,10 @@ export interface TableBundle {
 export interface TimelineEvent {
   year: number;
   event: string;
-  description: string;
-  importance: number;
+  description?: string;
+  importance?: number;
+  significance?: 'HIGH' | 'MEDIUM' | 'LOW';
+  source_id?: string;
 }
 
 export interface KnowledgeNode {

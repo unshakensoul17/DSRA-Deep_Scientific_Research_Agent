@@ -50,9 +50,9 @@ class ArxivAdapter(BaseRetrieverAdapter):
                 id_node = entry.find("atom:id", ns)
                 published_node = entry.find("atom:published", ns)
 
-                title = title_node.text.strip().replace("\n", " ") if title_node is not None else "Untitled"
-                summary = summary_node.text.strip() if summary_node is not None else ""
-                url_str = id_node.text.strip() if id_node is not None else ""
+                title = title_node.text.strip().replace("\n", " ") if (title_node is not None and title_node.text) else "Untitled"
+                summary = summary_node.text.strip() if (summary_node is not None and summary_node.text) else ""
+                url_str = id_node.text.strip() if (id_node is not None and id_node.text) else ""
 
                 # Extract publish year
                 year = None

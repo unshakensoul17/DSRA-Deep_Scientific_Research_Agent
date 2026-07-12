@@ -166,6 +166,13 @@ class ExportAgent(BaseAgent[ExportAgentInput, ExportBundle]):
 
     def _generate_pdf(self, path: str, input_data: ExportAgentInput) -> None:
         """Builds ReportLab document."""
+        import html
+
+        def clean_text(text: str) -> str:
+            if not text:
+                return ""
+            return html.escape(text)
+
         doc = SimpleDocTemplate(
             path,
             pagesize=letter,
@@ -209,49 +216,49 @@ class ExportAgent(BaseAgent[ExportAgentInput, ExportBundle]):
         story = []
 
         # Cover / Header
-        story.append(Paragraph(input_data.report.title, title_style))
+        story.append(Paragraph(clean_text(input_data.report.title), title_style))
         story.append(Spacer(1, 15))
 
         # Executive Summary
         story.append(Paragraph("Executive Summary", h2_style))
-        story.append(Paragraph(input_data.report.executive_summary, body_style))
+        story.append(Paragraph(clean_text(input_data.report.executive_summary), body_style))
         story.append(Spacer(1, 10))
 
         # Key Findings
         if input_data.report.key_findings:
             story.append(Paragraph("Key Findings", h2_style))
             for finding in input_data.report.key_findings:
-                story.append(Paragraph(f"• {finding}", body_style))
+                story.append(Paragraph(f"• {clean_text(finding)}", body_style))
             story.append(Spacer(1, 10))
 
         # Sections
         for sec in input_data.report.sections:
-            story.append(Paragraph(sec.title, h2_style))
-            story.append(Paragraph(sec.content, body_style))
+            story.append(Paragraph(clean_text(sec.title), h2_style))
+            story.append(Paragraph(clean_text(sec.content), body_style))
             story.append(Spacer(1, 10))
 
         # Methodology
         story.append(Paragraph("Methodology", h2_style))
-        story.append(Paragraph(input_data.report.methodology_description, body_style))
+        story.append(Paragraph(clean_text(input_data.report.methodology_description), body_style))
         story.append(Spacer(1, 10))
 
         # Limitations
         story.append(Paragraph("Limitations", h2_style))
-        story.append(Paragraph(input_data.report.limitations, body_style))
+        story.append(Paragraph(clean_text(input_data.report.limitations), body_style))
         story.append(Spacer(1, 10))
 
         # Conclusion
         story.append(Paragraph("Conclusion", h2_style))
-        story.append(Paragraph(input_data.report.conclusion, body_style))
+        story.append(Paragraph(clean_text(input_data.report.conclusion), body_style))
         story.append(Spacer(1, 10))
 
         # References
         if input_data.report.references:
             story.append(Paragraph("References", h2_style))
             for ref in input_data.report.references:
-                venue_str = f", <i>{ref.source_type}</i>" if ref.source_type else ""
+                venue_str = f", <i>{clean_text(ref.source_type)}</i>" if ref.source_type else ""
                 year_str = f" ({ref.year})" if ref.year else ""
-                ref_text = f"<b>{ref.citation_key}</b>: {ref.title}{venue_str}{year_str}"
+                ref_text = f"<b>{clean_text(ref.citation_key)}</b>: {clean_text(ref.title)}{venue_str}{year_str}"
                 story.append(Paragraph(ref_text, body_style))
 
         doc.build(story)

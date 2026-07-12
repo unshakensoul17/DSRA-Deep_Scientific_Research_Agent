@@ -8,7 +8,13 @@ from typing import ClassVar
 
 from app.agents.base import BaseAgent
 from app.llm.prompts.gap_analysis import gap_analysis_prompt
-from app.schemas.agents.all_agents import GapAnalysisAgentInput, GapAnalysisAgentOutput
+from app.schemas.agents.all_agents import (
+    GapAnalysisAgentInput,
+    GapAnalysisAgentOutput,
+    GapAnalysisLLMOutput,
+    RuntimeResearchGap,
+)
+from app.schemas.common import SearchQuery
 
 
 class GapAnalysisAgent(BaseAgent[GapAnalysisAgentInput, GapAnalysisAgentOutput]):
@@ -55,21 +61,40 @@ class GapAnalysisAgent(BaseAgent[GapAnalysisAgentInput, GapAnalysisAgentOutput])
             },
         ]
 
-        # Call gateway for validated Pydantic model response
-        output = await self.llm.get_structured_completion(
+        # Call gateway with LLM-facing schema (no runtime session_id)
+        llm_output = await self.llm.get_structured_completion(
             messages=messages,
-            response_schema=GapAnalysisAgentOutput,
+            response_schema=GapAnalysisLLMOutput,
             temperature=0.1,
         )
 
-        # Enforce session id mapping
-        output.session_id = input_data.session_id
-        
-        # Enforce that query IDs inside suggested queries are initialized
-        for gap in output.gaps:
-            for q in gap.suggested_queries:
-                q.priority = max(0.0, min(q.priority or 1.0, 1.0))
-        for q in output.new_queries:
-            q.priority = max(0.0, min(q.priority or 1.0, 1.0))
+        # Map LLMSearchQuery items to runtime SearchQuery with fresh IDs
+        def _to_search_query(lq) -> SearchQuery:
+            return SearchQuery(
+                query_text=lq.query_text,
+                source_type=lq.source_type,
+                priority=max(0.0, min(lq.priority or 1.0, 1.0)),
+                filters=lq.filters,
+            )
 
-        return output
+        new_queries = [_to_search_query(q) for q in llm_output.new_queries]
+
+        # Convert gap suggested queries similarly
+        gaps = []
+        for g in llm_output.gaps:
+            mapped_suggestions = [_to_search_query(q) for q in g.suggested_queries]
+            gaps.append(RuntimeResearchGap(
+                description=g.description,
+                severity=g.severity,
+                suggested_queries=mapped_suggestions,
+            ))
+
+        return GapAnalysisAgentOutput(
+            session_id=input_data.session_id,
+            gaps=gaps,
+            has_critical_gaps=llm_output.has_critical_gaps,
+            should_iterate=llm_output.should_iterate,
+            new_queries=new_queries,
+            iteration_reasoning=llm_output.iteration_reasoning,
+            coverage_score=llm_output.coverage_score,
+        )

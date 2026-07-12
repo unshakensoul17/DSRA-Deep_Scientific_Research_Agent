@@ -84,6 +84,12 @@ async def test_create_session(mock_db_session, test_user, auth_headers):
 async def test_get_session_details_owner_success(mock_db_session, test_user, auth_headers):
     """Verifies that the session owner can view details of their workspace."""
     session_id = uuid.uuid4()
+    log_timestamp = datetime.now(timezone.utc)
+    execution_log = MagicMock()
+    execution_log.agent_name = "PlannerAgent"
+    execution_log.error_message = "Planner agent failed"
+    execution_log.created_at = log_timestamp
+
     session_record = ResearchSession(
         id=session_id,
         user_id=test_user.id,
@@ -95,7 +101,7 @@ async def test_get_session_details_owner_success(mock_db_session, test_user, aut
         sources=[],
         claims=[],
         reports=[],
-        execution_logs=[],
+        execution_logs=[execution_log],
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc)
     )
@@ -118,6 +124,14 @@ async def test_get_session_details_owner_success(mock_db_session, test_user, aut
     data = response.json()
     assert data["session_id"] == str(session_id)
     assert data["topic"] == "CRISPR repair"
+    assert data["agent_timeline"] == [
+        {
+            "agent": "PlannerAgent",
+            "status": "FAILED",
+            "message": "Planner agent failed",
+            "timestamp": log_timestamp.isoformat(),
+        }
+    ]
 
     app.dependency_overrides.clear()
 

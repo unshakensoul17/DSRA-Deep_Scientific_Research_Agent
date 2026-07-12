@@ -29,13 +29,19 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "8010:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/dsra_v2
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      APP_SECRET_KEY: 12345678901234567890123456789012
-      JWT_SECRET_KEY: 12345678901234567890123456789012
-      OPENAI_API_KEY: sk-placeholder-key-replace-in-production
+      POSTGRES_DB: dsra_v2
+      APP_SECRET_KEY: "12345678901234567890123456789012"
+      JWT_SECRET_KEY: "12345678901234567890123456789012"
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_DEFAULT_MODEL: gemini-3.1-flash-lite
+      GEMINI_FALLBACK_MODEL: gemini-1.5-flash
+      GEMINI_REQUEST_TIMEOUT: 45
     volumes:
       - shared_exports:/workspace/exports
 

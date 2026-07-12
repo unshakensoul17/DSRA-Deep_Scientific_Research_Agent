@@ -11,6 +11,7 @@ import traceback
 from typing import Any, Optional
 from uuid import UUID
 
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import get_settings
@@ -34,6 +35,7 @@ from app.schemas.common import (
     SourceType,
     SSEEvent,
     SSEEventType,
+    VerificationStatus,
     VerifiedClaim,
 )
 
@@ -82,6 +84,8 @@ class ResearchOrchestrator:
                 self.db_session.add(db_q)
                 queries_created.append(db_q)
             await self.db_session.commit()
+            for original_query, db_query in zip(plan.queries, queries_created, strict=True):
+                original_query.id = db_query.id
             
             # --- RESEARCH ITERATIVE LOOP ---
             iteration = 0
@@ -118,33 +122,50 @@ class ResearchOrchestrator:
                 # 3. Transition state to EVIDENCE_EXTRACTION
                 await self._transition_state(session_id, SessionState.RETRIEVAL, SessionState.EVIDENCE_EXTRACTION)
                 log.info("evidence_phase_started", session_id=str(session_id), iteration=iteration)
-                
-                evidence_pieces, source_qualities = await self._run_evidence_agent(session_id, new_sources, session.topic)
-                
-                # Update source quality scores in DB
-                for db_source in session.sources:
-                    score = source_qualities.get(str(db_source.id))
-                    if score is not None:
-                        db_source.quality_score = score
-                await self.db_session.commit()
-                
-                # Emit evidence count to SSE
-                await event_broker.publish(
-                    session_id,
-                    SSEEvent(
-                        event=SSEEventType.EVIDENCE_EXTRACTED,
-                        session_id=session_id,
-                        data={"evidence_count": len(evidence_pieces)}
+
+                if new_sources:
+                    evidence_pieces, source_qualities = await self._run_evidence_agent(session_id, new_sources, session.topic)
+
+                    # Update source quality scores in DB using the canonical SourceResult IDs.
+                    for source_id, score in source_qualities.items():
+                        await self.db_session.execute(
+                            update(DBSource)
+                            .where(DBSource.id == UUID(str(source_id)))
+                            .values(quality_score=score)
+                        )
+                    await self.db_session.commit()
+
+                    # Emit evidence count to SSE
+                    await event_broker.publish(
+                        session_id,
+                        SSEEvent(
+                            event=SSEEventType.EVIDENCE_EXTRACTED,
+                            session_id=session_id,
+                            data={"evidence_count": len(evidence_pieces)}
+                        )
                     )
-                )
-                
-                # 4. Transition state to VERIFICATION
-                await self._transition_state(session_id, SessionState.EVIDENCE_EXTRACTION, SessionState.VERIFICATION)
-                log.info("verification_phase_started", session_id=str(session_id), iteration=iteration)
-                
-                new_verified_claims = await self._run_verification_agent(session_id, evidence_pieces, all_sources, session.topic)
-                verified_claims.extend(new_verified_claims)
-                
+
+                    # 4. Transition state to VERIFICATION
+                    await self._transition_state(session_id, SessionState.EVIDENCE_EXTRACTION, SessionState.VERIFICATION)
+                    log.info("verification_phase_started", session_id=str(session_id), iteration=iteration)
+
+                    new_verified_claims = await self._run_verification_agent(session_id, evidence_pieces, all_sources, session.topic)
+                    verified_claims.extend(new_verified_claims)
+                else:
+                    evidence_pieces = []
+                    source_qualities = {}
+                    log.warning("retrieval_returned_no_sources", session_id=str(session_id), iteration=iteration)
+                    await event_broker.publish(
+                        session_id,
+                        SSEEvent(
+                            event=SSEEventType.EVIDENCE_EXTRACTED,
+                            session_id=session_id,
+                            data={"evidence_count": 0}
+                        )
+                    )
+                    await self._transition_state(session_id, SessionState.EVIDENCE_EXTRACTION, SessionState.VERIFICATION)
+                    log.info("verification_phase_skipped_no_sources", session_id=str(session_id), iteration=iteration)
+
                 # 5. Transition state to GAP_ANALYSIS
                 await self._transition_state(session_id, SessionState.VERIFICATION, SessionState.GAP_ANALYSIS)
                 log.info("gap_analysis_phase_started", session_id=str(session_id), iteration=iteration)
@@ -178,6 +199,7 @@ class ResearchOrchestrator:
                             filters=q.filters
                         )
                         self.db_session.add(db_q)
+                        q.id = db_q.id
                     await self.db_session.commit()
                     
                     current_queries = gap_report.new_queries
@@ -241,12 +263,13 @@ class ResearchOrchestrator:
                 session_id=session_id,
                 title=draft.title,
                 executive_summary=draft.executive_summary,
-                sections=[s.model_dump() for s in draft.sections],
+                sections=[s.model_dump(mode="json") for s in draft.sections],
                 key_findings=draft.key_findings,
                 methodology=draft.methodology_description,
                 limitations=draft.limitations,
                 conclusion=draft.conclusion,
-                references=[r.model_dump() for r in draft.references],
+                references=[r.model_dump(mode="json") for r in draft.references],
+                visualization=viz_bundle.model_dump(mode="json"),
                 status=draft.status,
                 critique_score=critique.overall_score,
                 export_paths={
@@ -396,6 +419,7 @@ class ResearchOrchestrator:
             # Save raw sources to database
             for src in output.results:
                 db_source = DBSource(
+                    id=src.id,
                     session_id=session_id,
                     query_id=query_item.id,
                     title=src.title,
@@ -467,10 +491,11 @@ class ResearchOrchestrator:
             # Save extracted claims to DB as UNVERIFIED
             for ep in output.evidence_pieces:
                 db_claim = DBClaim(
+                    id=ep.id,
                     session_id=session_id,
                     text=ep.claim_text,
                     confidence=0.0,
-                    status=SessionState.CREATED.value,  # Placeholder state
+                    status=VerificationStatus.UNVERIFIED,
                     source_ids=[ep.source_id],
                     iteration=ep.iteration
                 )
@@ -521,20 +546,42 @@ class ResearchOrchestrator:
             output = await agent.run(agent_input)
             duration = int((datetime.utcnow() - start_t).total_seconds() * 1000)
             
-            # Update DB claims with verification statuses and reasoning
+            # Update DB claims with verification statuses and reasoning.
             for vc in output.verified_claims:
-                # Find matching unverified claim or insert
-                # In normal execution, update corresponding DBClaim records
-                # Let's insert VerificationResult logs
-                for src_id in vc.supporting_source_ids:
-                    db_res = DBVerificationResult(
-                        claim_id=vc.id,  # Assume matching ID mapping
+                source_ids = list(dict.fromkeys(vc.supporting_source_ids + vc.contradicting_source_ids))
+                result = await self.db_session.execute(
+                    update(DBClaim)
+                    .where(DBClaim.id == vc.id)
+                    .values(
+                        text=vc.text,
+                        confidence=vc.confidence,
+                        status=vc.status,
+                        source_ids=source_ids,
+                        iteration=vc.iteration,
+                    )
+                )
+                if result.rowcount == 0:
+                    self.db_session.add(
+                        DBClaim(
+                            id=vc.id,
+                            session_id=session_id,
+                            text=vc.text,
+                            confidence=vc.confidence,
+                            status=vc.status,
+                            source_ids=source_ids,
+                            iteration=vc.iteration,
+                        )
+                    )
+
+                self.db_session.add(
+                    DBVerificationResult(
+                        claim_id=vc.id,
                         supporting_source_ids=vc.supporting_source_ids,
                         contradicting_source_ids=vc.contradicting_source_ids,
                         confidence=vc.confidence,
-                        reasoning=vc.reasoning
+                        reasoning=vc.reasoning,
                     )
-                    self.db_session.add(db_res)
+                )
             await self.db_session.commit()
             
             audit_log = AgentExecutionLog(

@@ -68,11 +68,11 @@ class Settings(BaseSettings):
         )
 
     # ── LLM ──────────────────────────────────────────────────────────
-    openai_api_key: str = Field(..., min_length=20)
-    openai_default_model: str = "gpt-4o"
-    openai_fallback_model: str = "gpt-4o-mini"
-    openai_max_retries: int = Field(default=3, ge=1, le=10)
-    openai_request_timeout: int = Field(default=120, ge=10, le=600)
+    gemini_api_key: str = Field(..., min_length=20)
+    gemini_default_model: str = "gemini-1.5-pro"
+    gemini_fallback_model: str = "gemini-1.5-flash"
+    gemini_max_retries: int = Field(default=3, ge=1, le=10)
+    gemini_request_timeout: int = Field(default=120, ge=10, le=600)
 
     # ── Source APIs ───────────────────────────────────────────────────
     google_cse_api_key: str | None = None

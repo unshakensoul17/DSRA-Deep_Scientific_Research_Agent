@@ -9,8 +9,8 @@ import uuid
 
 from app.agents.base import BaseAgent
 from app.llm.prompts.writer import writer_prompt
-from app.schemas.agents.all_agents import WriterAgentInput
-from app.schemas.common import ReportDraft, ReportStatus
+from app.schemas.agents.all_agents import WriterAgentInput, WriterLLMOutput
+from app.schemas.common import ReportDraft, ReportReference, ReportSection, ReportStatus, SourceType
 
 
 class WriterAgent(BaseAgent[WriterAgentInput, ReportDraft]):
@@ -80,17 +80,66 @@ class WriterAgent(BaseAgent[WriterAgentInput, ReportDraft]):
             {"role": "user", "content": user_content},
         ]
 
-        # Call gateway for validated Pydantic model response
-        output = await self.llm.get_structured_completion(
+        # Call gateway with LLM-facing schema (no runtime UUIDs)
+        llm_output = await self.llm.get_structured_completion(
             messages=messages,
-            response_schema=ReportDraft,
+            response_schema=WriterLLMOutput,
             temperature=0.3,
         )
 
-        # Enforce ID settings and metadata consistency
-        output.session_id = input_data.session_id
-        if not output.id:
-            output.id = uuid.uuid4()
-        output.status = ReportStatus.DRAFT
+        # Build a lookup from string source_id -> real source UUIDs
+        source_id_map = {str(src.id): src.id for src in input_data.sources}
 
-        return output
+        # Convert LLM sections to runtime ReportSection objects
+        runtime_sections = [
+            ReportSection(title=sec.title, content=sec.content)
+            for sec in llm_output.sections
+        ]
+
+        # Convert LLM references to runtime ReportReference objects, matching real source IDs
+        runtime_references = []
+        for ref in llm_output.references:
+            real_source_id = source_id_map.get(ref.source_id)
+            if real_source_id is None:
+                # Hallucinated ID — try to match by title, then skip if not found
+                matched = next(
+                    (src for src in input_data.sources if src.title == ref.title), None
+                )
+                real_source_id = matched.id if matched else None
+            if real_source_id is None:
+                continue  # Skip orphaned references to avoid FK violations
+
+            try:
+                source_type_val = SourceType(ref.source_type)
+            except ValueError:
+                source_type_val = SourceType.ARXIV
+
+            runtime_references.append(
+                ReportReference(
+                    source_id=real_source_id,
+                    citation_key=ref.citation_key,
+                    title=ref.title,
+                    url=ref.url,
+                    authors=ref.authors,
+                    year=ref.year,
+                    source_type=source_type_val,
+                    doi=ref.doi,
+                )
+            )
+
+        # Assemble runtime ReportDraft with correct IDs
+        draft = ReportDraft(
+            id=uuid.uuid4(),
+            session_id=input_data.session_id,
+            title=llm_output.title,
+            executive_summary=llm_output.executive_summary,
+            sections=runtime_sections,
+            key_findings=llm_output.key_findings,
+            references=runtime_references,
+            methodology_description=llm_output.methodology_description,
+            limitations=llm_output.limitations,
+            conclusion=llm_output.conclusion,
+            revision=llm_output.revision,
+            status=ReportStatus.DRAFT,
+        )
+        return draft

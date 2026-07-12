@@ -16,7 +16,7 @@ from enum import Enum
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -94,10 +94,10 @@ class ExportFormat(str, Enum):
 class DSRABaseModel(BaseModel):
     """
     Base model for all DSRA schemas.
-    Enforces strict mode — no implicit type coercion.
+    Allows standard type coercion (like strings to enums) during validation.
     """
     model_config = ConfigDict(
-        strict=True,
+        strict=False,
         use_enum_values=True,
         populate_by_name=True,
         frozen=False,
@@ -120,6 +120,20 @@ class SearchQuery(DSRABaseModel):
     # SemanticScholar: {"fields_of_study": ["Medicine"], "year": "2020-2024"}
     # PubMed: {"mesh_terms": ["CRISPR"], "publication_types": ["Clinical Trial"]}
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_llm_aliases(cls, data: Any) -> Any:
+        """Accept common LLM/legacy keys while storing the canonical contract."""
+        if not isinstance(data, dict):
+            return data
+
+        normalized = dict(data)
+        if "query_text" not in normalized and "query" in normalized:
+            normalized["query_text"] = normalized["query"]
+        if "source_type" not in normalized and "engine" in normalized:
+            normalized["source_type"] = normalized["engine"]
+        return normalized
+
 
 class SourceResult(DSRABaseModel):
     """
@@ -127,8 +141,8 @@ class SourceResult(DSRABaseModel):
     Produced by RetrieverAdapters, consumed by EvidenceAgent.
     """
     id: UUID = Field(default_factory=uuid4)
-    session_id: UUID
-    query_id: UUID
+    session_id: Optional[UUID] = None
+    query_id: Optional[UUID] = None
     title: str = Field(..., min_length=1, max_length=1000)
     url: Optional[str] = None
     snippet: str = Field(..., min_length=1)

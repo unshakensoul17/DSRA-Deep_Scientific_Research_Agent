@@ -17,6 +17,7 @@ from app.schemas.common import (
     SessionState,
     SourceType,
     ResearchDepth,
+    SearchQuery,
     SourceResult,
     EvidencePiece,
     VerifiedClaim,
@@ -34,6 +35,9 @@ from app.schemas.agents.all_agents import (
 )
 from app.db.models.research_session import ResearchSession
 from app.db.models.user import User
+from app.db.models.research_query import ResearchQuery
+from app.db.models.source import Source as DBSource
+from app.db.models.claim import Claim as DBClaim, VerificationResult
 
 
 @pytest.fixture
@@ -43,7 +47,7 @@ def mock_db_session():
     session.commit = AsyncMock()
     session.rollback = AsyncMock()
     session.refresh = AsyncMock()
-    session.execute = MagicMock()
+    session.execute = AsyncMock()
     return session
 
 
@@ -91,7 +95,6 @@ async def test_full_research_workflow_success(mock_db_session, test_user):
     
     # 2. Mock Agent Outputs with proper Pydantic schemas
     # A. Planner Output
-    from app.schemas.common import SearchQuery
     mock_plan = MagicMock()
     mock_plan.queries = [
         SearchQuery(id=uuid.uuid4(), query_text="Query 1", source_type=SourceType.ARXIV, filters={}),
@@ -289,3 +292,284 @@ async def test_full_research_workflow_success(mock_db_session, test_user):
     
     # Verify log audit records were added to DB session
     assert mock_db_session.add.call_count >= 5
+
+
+@pytest.mark.asyncio
+async def test_workflow_preserves_query_source_and_claim_ids(mock_db_session, test_user):
+    session_id = uuid.uuid4()
+    query_id = uuid.uuid4()
+    source_id = uuid.uuid4()
+    claim_id = uuid.uuid4()
+
+    session_record = ResearchSession(
+        id=session_id,
+        user_id=test_user.id,
+        topic="ID preservation workflow test",
+        state=SessionState.CREATED,
+        depth=ResearchDepth.NORMAL,
+        max_iterations=1,
+        iteration_count=0,
+        sources=[],
+        claims=[],
+        reports=[],
+        execution_logs=[],
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+
+    mock_session_repo = MagicMock()
+    mock_session_repo.get_by_id = AsyncMock(return_value=session_record)
+
+    query = SearchQuery(id=query_id, query_text="Query 1", source_type=SourceType.ARXIV, filters={})
+    mock_plan = MagicMock()
+    mock_plan.queries = [query]
+    mock_plan.topic = session_record.topic
+    mock_plan.focus_areas = []
+    mock_plan.estimated_complexity = 0.5
+
+    source = SourceResult(
+        id=source_id,
+        session_id=session_id,
+        query_id=query_id,
+        title="Real Source",
+        url="http://example.com/source",
+        snippet="Snippet",
+        full_content="Full content",
+        source_type=SourceType.ARXIV,
+        authors=["Author"],
+        year=2026,
+        citation_count=5,
+        quality_score=0.8,
+    )
+    mock_research_output = MagicMock()
+    mock_research_output.results = [source]
+
+    evidence_piece = EvidencePiece(
+        id=claim_id,
+        session_id=session_id,
+        claim_text="Atomic scientific claim for preservation test.",
+        source_id=source_id,
+        relevance_score=0.9,
+        excerpt="excerpt",
+    )
+    mock_evidence_output = MagicMock()
+    mock_evidence_output.evidence_pieces = [evidence_piece]
+    mock_evidence_output.source_quality_scores = {str(source_id): 0.8}
+
+    verified_claim = VerifiedClaim(
+        id=claim_id,
+        session_id=session_id,
+        text="Atomic scientific claim for preservation test.",
+        confidence=0.95,
+        status=VerificationStatus.VERIFIED,
+        supporting_source_ids=[source_id],
+        contradicting_source_ids=[],
+        reasoning="Supported by the stored source.",
+    )
+    mock_verification_output = MagicMock()
+    mock_verification_output.verified_claims = [verified_claim]
+    mock_verification_output.contradictions_found = 0
+
+    mock_gap_output = GapAnalysisAgentOutput(
+        session_id=session_id,
+        gaps=[],
+        has_critical_gaps=False,
+        should_iterate=False,
+        new_queries=[],
+        iteration_reasoning="Enough coverage",
+        coverage_score=1.0,
+    )
+
+    mock_writer_output = ReportDraft(
+        id=uuid.uuid4(),
+        session_id=session_id,
+        title="Workflow Report",
+        executive_summary=("A" * 160),
+        sections=[
+            ReportSection(title="Introduction", content="A" * 120),
+            ReportSection(title="Background", content="B" * 120),
+            ReportSection(title="Methodology", content="C" * 120),
+            ReportSection(title="Findings", content="D" * 120),
+            ReportSection(title="Conclusion", content="E" * 120),
+        ],
+        key_findings=["F1", "F2", "F3"],
+        methodology_description="M" * 60,
+        limitations="L" * 60,
+        conclusion="Z" * 120,
+        references=[
+            ReportReference(source_id=source_id, citation_key="Ref2026", title="Ref title", source_type=SourceType.ARXIV)
+        ],
+    )
+
+    mock_critic_output = CritiqueResult(
+        session_id=session_id,
+        draft_id=mock_writer_output.id,
+        scores=[CritiqueScore(dimension="Coverage", score=9.0, feedback="Strong coverage feedback")],
+        overall_score=9.0,
+        strengths=["Strong"],
+        weaknesses=[],
+        missing_points=[],
+        revision_required=False,
+        revision_instructions=[],
+        approved=True,
+    )
+
+    mock_viz_output = VisualizationBundle(
+        session_id=session_id,
+        tables=[],
+        timeline=[],
+        knowledge_nodes=[],
+        knowledge_edges=[],
+        confidence_distribution={},
+        source_type_distribution={},
+    )
+
+    mock_export_output = ExportBundle(
+        session_id=session_id,
+        report_id=mock_writer_output.id,
+        markdown_path="/tmp/report.md",
+        json_path="/tmp/report.json",
+        html_path="/tmp/report.html",
+        pdf_path="/tmp/report.pdf",
+        file_sizes={"markdown": 100, "json": 150, "html": 200, "pdf": 300},
+    )
+
+    orchestrator = ResearchOrchestrator(mock_db_session)
+    orchestrator.session_repo = mock_session_repo
+
+    with patch("app.agents.planner.PlannerAgent.run", AsyncMock(return_value=mock_plan)), \
+         patch("app.agents.researcher.ResearchAgent.run", AsyncMock(return_value=mock_research_output)), \
+         patch("app.agents.evidence.EvidenceAgent.run", AsyncMock(return_value=mock_evidence_output)), \
+         patch("app.agents.verification.VerificationAgent.run", AsyncMock(return_value=mock_verification_output)), \
+         patch("app.agents.gap_analysis.GapAnalysisAgent.run", AsyncMock(return_value=mock_gap_output)), \
+         patch("app.agents.writer.WriterAgent.run", AsyncMock(return_value=mock_writer_output)), \
+         patch("app.agents.critic.CriticAgent.run", AsyncMock(return_value=mock_critic_output)), \
+         patch("app.agents.visualization.VisualizationAgent.run", AsyncMock(return_value=mock_viz_output)), \
+         patch("app.agents.export.ExportAgent.run", AsyncMock(return_value=mock_export_output)), \
+         patch("app.core.events.event_broker.publish", AsyncMock()):
+        await orchestrator.run_research_session(session_id)
+
+    added = [call.args[0] for call in mock_db_session.add.call_args_list]
+    research_queries = [item for item in added if isinstance(item, ResearchQuery)]
+    sources = [item for item in added if isinstance(item, DBSource)]
+    claims = [item for item in added if isinstance(item, DBClaim)]
+    verification_results = [item for item in added if isinstance(item, VerificationResult)]
+
+    assert len(research_queries) == 1
+    assert len(sources) == 1
+    assert any(item.id == source_id and item.query_id == research_queries[0].id for item in sources)
+    assert any(item.id == claim_id and item.status == VerificationStatus.UNVERIFIED for item in claims)
+    assert any(item.claim_id == claim_id for item in verification_results)
+
+
+@pytest.mark.asyncio
+async def test_workflow_skips_evidence_when_retrieval_returns_no_sources(mock_db_session, test_user):
+    session_id = uuid.uuid4()
+    session_record = ResearchSession(
+        id=session_id,
+        user_id=test_user.id,
+        topic="No source workflow test",
+        state=SessionState.CREATED,
+        depth=ResearchDepth.NORMAL,
+        max_iterations=1,
+        iteration_count=0,
+        sources=[],
+        claims=[],
+        reports=[],
+        execution_logs=[],
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+
+    mock_session_repo = MagicMock()
+    mock_session_repo.get_by_id = AsyncMock(return_value=session_record)
+
+    mock_plan = MagicMock()
+    mock_plan.queries = [SearchQuery(id=uuid.uuid4(), query_text="Query 1", source_type=SourceType.ARXIV, filters={})]
+    mock_plan.topic = session_record.topic
+    mock_plan.focus_areas = []
+    mock_plan.estimated_complexity = 0.5
+
+    mock_research_output = MagicMock()
+    mock_research_output.results = []
+
+    mock_gap_output = GapAnalysisAgentOutput(
+        session_id=session_id,
+        gaps=[],
+        has_critical_gaps=False,
+        should_iterate=False,
+        new_queries=[],
+        iteration_reasoning="No sources retrieved.",
+        coverage_score=0.0,
+    )
+
+    mock_writer_output = ReportDraft(
+        id=uuid.uuid4(),
+        session_id=session_id,
+        title="No source report",
+        executive_summary="A" * 160,
+        sections=[
+            ReportSection(title="Introduction", content="A" * 120),
+            ReportSection(title="Background", content="B" * 120),
+            ReportSection(title="Methodology", content="C" * 120),
+            ReportSection(title="Findings", content="D" * 120),
+            ReportSection(title="Conclusion", content="E" * 120),
+        ],
+        key_findings=["F1", "F2", "F3"],
+        methodology_description="M" * 60,
+        limitations="L" * 60,
+        conclusion="Z" * 120,
+        references=[],
+    )
+
+    mock_critic_output = CritiqueResult(
+        session_id=session_id,
+        draft_id=mock_writer_output.id,
+        scores=[CritiqueScore(dimension="Coverage", score=8.0, feedback="Coverage feedback text")],
+        overall_score=8.0,
+        strengths=["OK"],
+        weaknesses=[],
+        missing_points=[],
+        revision_required=False,
+        revision_instructions=[],
+        approved=True,
+    )
+
+    mock_viz_output = VisualizationBundle(
+        session_id=session_id,
+        tables=[],
+        timeline=[],
+        knowledge_nodes=[],
+        knowledge_edges=[],
+        confidence_distribution={},
+        source_type_distribution={},
+    )
+
+    mock_export_output = ExportBundle(
+        session_id=session_id,
+        report_id=mock_writer_output.id,
+        markdown_path="/tmp/report.md",
+        json_path="/tmp/report.json",
+        html_path="/tmp/report.html",
+        pdf_path="/tmp/report.pdf",
+        file_sizes={"markdown": 100, "json": 150, "html": 200, "pdf": 300},
+    )
+
+    orchestrator = ResearchOrchestrator(mock_db_session)
+    orchestrator.session_repo = mock_session_repo
+
+    with patch("app.agents.planner.PlannerAgent.run", AsyncMock(return_value=mock_plan)), \
+         patch("app.agents.researcher.ResearchAgent.run", AsyncMock(return_value=mock_research_output)), \
+         patch("app.agents.evidence.EvidenceAgent.run", AsyncMock()) as mock_evidence_run, \
+         patch("app.agents.verification.VerificationAgent.run", AsyncMock()) as mock_verification_run, \
+         patch("app.agents.gap_analysis.GapAnalysisAgent.run", AsyncMock(return_value=mock_gap_output)), \
+         patch("app.agents.writer.WriterAgent.run", AsyncMock(return_value=mock_writer_output)), \
+         patch("app.agents.critic.CriticAgent.run", AsyncMock(return_value=mock_critic_output)), \
+         patch("app.agents.visualization.VisualizationAgent.run", AsyncMock(return_value=mock_viz_output)), \
+         patch("app.agents.export.ExportAgent.run", AsyncMock(return_value=mock_export_output)), \
+         patch("app.core.events.event_broker.publish", AsyncMock()):
+        await orchestrator.run_research_session(session_id)
+
+    assert session_record.state == SessionState.COMPLETED
+    assert mock_evidence_run.await_count == 0
+    assert mock_verification_run.await_count == 0
