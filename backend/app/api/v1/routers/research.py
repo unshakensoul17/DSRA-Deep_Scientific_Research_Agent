@@ -486,10 +486,16 @@ async def download_report_export(
     for finding in report.key_findings:
         md_content += f"- {finding}\n"
     for sec in report.sections:
-        md_content += f"\n## {sec.get('heading', 'Section')}\n{sec.get('content', '')}\n"
+        md_content += f"\n## {sec.get('title', 'Section')}\n{sec.get('content', '')}\n"
     md_content += f"\n## Methodology\n{report.methodology}\n"
     md_content += f"\n## Limitations\n{report.limitations}\n"
     md_content += f"\n## Conclusion\n{report.conclusion}\n"
+    if report.references:
+        md_content += f"\n## References\n"
+        for ref in report.references:
+            venue_str = f", {ref.get('source_type', '')}" if ref.get('source_type') else ""
+            year_str = f" ({ref.get('year', '')})" if ref.get('year') else ""
+            md_content += f"- **{ref.get('citation_key', 'Ref')}**: {ref.get('title', '')}{venue_str}{year_str}\n"
     
     if fmt == "md":
         return Response(content=md_content, media_type="text/markdown", headers={
@@ -515,9 +521,24 @@ async def download_report_export(
         for finding in report.key_findings:
             doc.add_paragraph(finding, style='List Bullet')
         for sec in report.sections:
-            doc.add_heading(sec.get('heading', 'Section'), level=1)
+            doc.add_heading(sec.get('title', 'Section'), level=1)
             doc.add_paragraph(sec.get('content', ''))
-            
+        
+        doc.add_heading('Methodology', level=1)
+        doc.add_paragraph(report.methodology)
+        
+        doc.add_heading('Limitations', level=1)
+        doc.add_paragraph(report.limitations)
+        
+        doc.add_heading('Conclusion', level=1)
+        doc.add_paragraph(report.conclusion)
+        
+        if report.references:
+            doc.add_heading('References', level=1)
+            for ref in report.references:
+                venue_str = f", {ref.get('source_type', '')}" if ref.get('source_type') else ""
+                year_str = f" ({ref.get('year', '')})" if ref.get('year') else ""
+                doc.add_paragraph(f"{ref.get('citation_key', 'Ref')}: {ref.get('title', '')}{venue_str}{year_str}", style='List Bullet')
         doc_io = io.BytesIO()
         doc.save(doc_io)
         doc_io.seek(0)
@@ -542,9 +563,36 @@ async def download_report_export(
         Story.append(Paragraph(report.executive_summary, styles['Normal']))
         Story.append(Spacer(1, 12))
         
+        if report.key_findings:
+            Story.append(Paragraph('Key Findings', styles['Heading1']))
+            for finding in report.key_findings:
+                Story.append(Paragraph(f"• {finding}", styles['Normal']))
+            Story.append(Spacer(1, 12))
+        
         for sec in report.sections:
-            Story.append(Paragraph(sec.get('heading', 'Section'), styles['Heading1']))
+            Story.append(Paragraph(sec.get('title', 'Section'), styles['Heading1']))
             Story.append(Paragraph(sec.get('content', ''), styles['Normal']))
+            Story.append(Spacer(1, 12))
+            
+        Story.append(Paragraph('Methodology', styles['Heading1']))
+        Story.append(Paragraph(report.methodology, styles['Normal']))
+        Story.append(Spacer(1, 12))
+        
+        Story.append(Paragraph('Limitations', styles['Heading1']))
+        Story.append(Paragraph(report.limitations, styles['Normal']))
+        Story.append(Spacer(1, 12))
+        
+        Story.append(Paragraph('Conclusion', styles['Heading1']))
+        Story.append(Paragraph(report.conclusion, styles['Normal']))
+        Story.append(Spacer(1, 12))
+        
+        if report.references:
+            Story.append(Paragraph('References', styles['Heading1']))
+            for ref in report.references:
+                venue_str = f", <i>{ref.get('source_type', '')}</i>" if ref.get('source_type') else ""
+                year_str = f" ({ref.get('year', '')})" if ref.get('year') else ""
+                ref_text = f"<b>{ref.get('citation_key', 'Ref')}</b>: {ref.get('title', '')}{venue_str}{year_str}"
+                Story.append(Paragraph(ref_text, styles['Normal']))
             Story.append(Spacer(1, 12))
             
         doc.build(Story)
