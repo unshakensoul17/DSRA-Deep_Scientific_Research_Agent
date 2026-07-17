@@ -241,7 +241,7 @@ function Navigation({ onStart }: { onStart: () => void }) {
   }, []);
 
   return (
-    <nav style={{
+    <nav className="landing-nav" style={{
       position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
       padding: "0 48px",
       height: 72,
@@ -275,7 +275,7 @@ function Navigation({ onStart }: { onStart: () => void }) {
       </div>
 
       {/* Links */}
-      <div style={{ display: "flex", alignItems: "center", gap: 30, fontFamily: "'Inter', sans-serif", fontSize: 14 }}>
+      <div className="landing-nav-links" style={{ display: "flex", alignItems: "center", gap: 30, fontFamily: "'Inter', sans-serif", fontSize: 14 }}>
         {["Features", "Architecture", "Pipeline", "Docs", "API", "Pricing"].map(l => (
           <a key={l} href="#" style={{ color: M, textDecoration: "none", transition: "color .2s" }}
             onMouseEnter={e => (e.currentTarget.style.color = "#fff")}
@@ -312,19 +312,19 @@ function Navigation({ onStart }: { onStart: () => void }) {
 // ── Hero ──────────────────────────────────────────────────────────────────────
 function HeroSection({ onStart }: { onStart: () => void }) {
   return (
-    <section style={{ position: "relative", minHeight: "100vh", display: "flex", alignItems: "center", overflow: "hidden" }}>
+    <section className="hero-section" style={{ position: "relative", minHeight: "100vh", display: "flex", alignItems: "center", overflow: "hidden" }}>
       <ParticleCanvas />
       <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 75% 65% at 60% 50%, rgba(123,92,255,0.13) 0%, transparent 70%)`, pointerEvents: "none" }} />
       <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 38% 38% at 15% 62%, rgba(79,163,255,0.07) 0%, transparent 60%)`, pointerEvents: "none" }} />
 
-      <div style={{
+      <div className="hero-container" style={{
         position: "relative", zIndex: 1, width: "100%", maxWidth: 1380,
         margin: "0 auto", padding: "100px 60px 60px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         gap: 60, flexWrap: "wrap",
       }}>
         {/* Left */}
-        <div style={{ maxWidth: 580, animation: "fade-up 1s ease both" }}>
+        <div className="hero-text" style={{ maxWidth: 580, animation: "fade-up 1s ease both" }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 100, background: `${P}18`, border: `1px solid ${P}44`, marginBottom: 32 }}>
             <div style={{ width: 7, height: 7, borderRadius: "50%", background: G, boxShadow: `0 0 8px ${G}`, animation: "pulse-ring 2s ease-in-out infinite" }} />
             <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: P }}>v2.0 — Now in Public Beta</span>
@@ -365,7 +365,7 @@ function HeroSection({ onStart }: { onStart: () => void }) {
           </div>
 
           {/* Stats */}
-          <div style={{ display: "flex", gap: 44, marginTop: 56, paddingTop: 40, borderTop: `1px solid ${BRD}` }}>
+          <div className="hero-stats" style={{ display: "flex", gap: 44, marginTop: 56, paddingTop: 40, borderTop: `1px solid ${BRD}` }}>
             {[["50M+", "Papers Indexed"], ["99.2%", "Accuracy Rate"], ["< 4 min", "Per Deep Report"]].map(([val, label]) => (
               <div key={label}>
                 <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 28, color: "#fff", letterSpacing: -1 }}>{val}</div>
@@ -376,7 +376,7 @@ function HeroSection({ onStart }: { onStart: () => void }) {
         </div>
 
         {/* Right: orb */}
-        <div style={{ flex: "0 0 auto", animation: "fade-up 1.2s ease .3s both" }}>
+        <div className="hero-visual" style={{ flex: "0 0 auto", animation: "fade-up 1.2s ease .3s both" }}>
           <ResearchCore />
         </div>
       </div>
@@ -420,7 +420,7 @@ function AgentPipelineSection() {
   ];
 
   return (
-    <section style={{ padding: "130px 60px", maxWidth: 1380, margin: "0 auto" }}>
+    <section className="landing-section" style={{ padding: "130px 60px", maxWidth: 1380, margin: "0 auto" }}>
       <SectionHeader tag="// AGENT ARCHITECTURE" title="Six Autonomous Agents.<br/>One Research Mission." sub="Each specialist handles its domain with precision. Together they form a complete scientific intelligence system." />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 22 }}>
         {agents.map((a, i) => (
@@ -461,7 +461,7 @@ function ResearchUniverseSection() {
   ];
 
   return (
-    <section style={{ padding: "130px 60px", background: "#0B0B0D", position: "relative", overflow: "hidden" }}>
+    <section className="landing-section" style={{ padding: "130px 60px", background: "#0B0B0D", position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: "70%", height: 1, background: `linear-gradient(90deg, transparent, ${BRD}, transparent)` }} />
       <div style={{ maxWidth: 1380, margin: "0 auto" }}>
         <SectionHeader tag="// RESEARCH AGENT" title="50 Million Papers.<br/>Searched in Seconds." sub="The Research Agent queries every major academic database simultaneously, returning confidence-scored, ranked results." />
@@ -513,9 +513,9 @@ function VerificationEngineSection() {
   ];
 
   return (
-    <section style={{ padding: "130px 60px", maxWidth: 1380, margin: "0 auto" }}>
+    <section className="landing-section" style={{ padding: "130px 60px", maxWidth: 1380, margin: "0 auto" }}>
       <SectionHeader tag="// VERIFICATION ENGINE" title="Every Claim.<br/>Triple-Verified." sub="Cross-database verification checks each extracted claim against multiple authoritative academic sources simultaneously." />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center" }}>
+      <div className="verification-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center" }}>
         {/* Graph */}
         <div className="rv" style={{ position: "relative", height: 380 }}>
           <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 100, height: 100, borderRadius: "50%", background: `radial-gradient(circle at 35% 33%, ${P}cc, ${P}55)`, boxShadow: `0 0 40px ${P}77, 0 0 80px ${P}33`, animation: "glow-pulse 3s ease-in-out infinite", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -577,10 +577,10 @@ function GapAnalysisSection() {
   const edges = [["core","n1"],["core","n2"],["core","n3"],["core","n4"],["n1","g1"],["n2","g1"],["n4","g2"],["n3","g3"]];
 
   return (
-    <section style={{ padding: "130px 60px", background: "#0B0B0D" }}>
+    <section className="landing-section" style={{ padding: "130px 60px", background: "#0B0B0D" }}>
       <div style={{ maxWidth: 1380, margin: "0 auto" }}>
         <SectionHeader tag="// GAP ANALYST" title="Discover What<br/>No One Has Studied." sub="DSRA maps the entire knowledge landscape to identify white-space opportunities — research gaps that represent high-impact frontiers." />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 56, alignItems: "center" }}>
+        <div className="gap-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 56, alignItems: "center" }}>
           {/* SVG graph */}
           <div className="rv gc" style={{ borderRadius: 22, padding: "20px 20px 12px", overflow: "hidden" }}>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: M, marginBottom: 10 }}>KNOWLEDGE GRAPH — Quantum Biology Domain</div>
@@ -658,9 +658,9 @@ function ReportGenerationSection() {
   ];
 
   return (
-    <section style={{ padding: "130px 60px", maxWidth: 1380, margin: "0 auto" }}>
+    <section className="landing-section" style={{ padding: "130px 60px", maxWidth: 1380, margin: "0 auto" }}>
       <SectionHeader tag="// WRITER + CRITIC" title="Publication-Ready<br/>in Under 4 Minutes." sub="The Writer Agent assembles your report autonomously. The Critic Agent then scores every dimension — coverage, citation, novelty, and more." />
-      <div style={{ display: "grid", gridTemplateColumns: "1.25fr 0.75fr", gap: 40, alignItems: "start" }}>
+      <div className="report-grid" style={{ display: "grid", gridTemplateColumns: "1.25fr 0.75fr", gap: 40, alignItems: "start" }}>
         {/* Document mockup */}
         <div className="rv gc" style={{ borderRadius: 22, overflow: "hidden" }}>
           <div style={{ padding: "12px 18px", borderBottom: `1px solid ${BRD}`, display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.02)" }}>
@@ -731,7 +731,7 @@ const dashData = [
 
 function DashboardSection() {
   return (
-    <section style={{ padding: "130px 60px", background: "#0B0B0D" }}>
+    <section className="landing-section" style={{ padding: "130px 60px", background: "#0B0B0D" }}>
       <div style={{ maxWidth: 1380, margin: "0 auto" }}>
         <SectionHeader tag="// LIVE DASHBOARD" title="Monitor Everything.<br/>In Real Time." sub="Track your research sessions with a premium command center. Every agent, paper, and confidence score — live." />
 
@@ -745,7 +745,7 @@ function DashboardSection() {
             </span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", minHeight: 520 }}>
+          <div className="dash-grid" style={{ display: "grid", gridTemplateColumns: "200px 1fr", minHeight: 520 }}>
             {/* Sidebar */}
             <div style={{ borderRight: `1px solid ${BRD}`, padding: "18px 14px", display: "flex", flexDirection: "column", gap: 3 }}>
               {[
@@ -769,7 +769,7 @@ function DashboardSection() {
             {/* Main */}
             <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
               {/* Metrics */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+              <div className="dash-metrics-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
                 {[
                   { label: "Papers Analyzed", value: "2,041",  delta: "+340 this minute", color: B   },
                   { label: "Active Agents",   value: "6 / 6",  delta: "All running",      color: G   },
@@ -842,9 +842,9 @@ function SecuritySection() {
   ];
 
   return (
-    <section style={{ padding: "130px 60px", maxWidth: 1380, margin: "0 auto" }}>
+    <section className="landing-section" style={{ padding: "130px 60px", maxWidth: 1380, margin: "0 auto" }}>
       <SectionHeader tag="// SECURITY" title="Enterprise-Grade<br/>Security by Design." sub="DSRA V2 is built from the ground up with security as a core requirement, not a retrofit." />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+      <div className="sec-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
         {features.map((f, i) => (
           <div key={f.title} className={`rv gc hl d${Math.min((i % 3) + 1, 4)}`} style={{ padding: 28, borderRadius: 22, position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", top: 20, right: 20, width: 8, height: 8, borderRadius: "50%", background: G, boxShadow: `0 0 10px ${G}`, animation: "pulse-ring 2.5s infinite" }} />
@@ -871,10 +871,10 @@ function ExportFormatsSection() {
   ];
 
   return (
-    <section style={{ padding: "130px 60px", background: "#0B0B0D" }}>
+    <section className="landing-section" style={{ padding: "130px 60px", background: "#0B0B0D" }}>
       <div style={{ maxWidth: 1380, margin: "0 auto" }}>
         <SectionHeader tag="// EXPORT" title="Export in Any Format.<br/>One Click." sub="Research outputs are automatically formatted for every audience — academic submission, developer integration, or team sharing." />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+        <div className="exp-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
           {formats.map((f, i) => (
             <div key={f.ext} className={`rv hl d${Math.min((i % 3) + 1, 4)}`} style={{ padding: 28, borderRadius: 22, background: C, border: `1px solid ${BRD}`, position: "relative", overflow: "hidden", cursor: "pointer", transition: "border-color .3s, box-shadow .3s" }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = `${f.color}55`; e.currentTarget.style.boxShadow = `0 0 28px ${f.color}20`; }}
@@ -968,7 +968,7 @@ function APISection() {
   const tabs = [["python", "Python"], ["typescript", "TypeScript"], ["curl", "cURL"]] as const;
 
   return (
-    <section style={{ padding: "130px 60px", maxWidth: 1380, margin: "0 auto" }}>
+    <section className="landing-section" style={{ padding: "130px 60px", maxWidth: 1380, margin: "0 auto" }}>
       <SectionHeader tag="// API" title="Built for Developers.<br/>Designed for Scale." sub="Integrate DSRA V2 into any research pipeline with a clean, well-documented API. Native SDKs for Python and TypeScript." />
 
       <div className="rv gc" style={{ borderRadius: 24, overflow: "hidden" }}>
@@ -1025,7 +1025,7 @@ function PricingSection({ onStart }: { onStart: () => void }) {
   ];
 
   return (
-    <section style={{ padding: "130px 60px", background: "#0B0B0D" }}>
+    <section className="landing-section" style={{ padding: "130px 60px", background: "#0B0B0D" }}>
       <div style={{ maxWidth: 1380, margin: "0 auto" }}>
         <SectionHeader tag="// PRICING" title="Simple, Transparent<br/>Pricing." sub="Start free, scale as your research grows. No hidden fees, no per-query surprises." />
 
@@ -1039,7 +1039,7 @@ function PricingSection({ onStart }: { onStart: () => void }) {
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: G, padding: "3px 10px", background: `${G}18`, border: `1px solid ${G}33`, borderRadius: 100 }}>Save 25%</span>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 22, alignItems: "start" }}>
+        <div className="price-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 22, alignItems: "start" }}>
           {plans.map((plan, i) => (
             <div key={plan.name} className={`rv hl d${i + 1}`} style={{ padding: 32, borderRadius: 24, background: plan.featured ? `linear-gradient(145deg, ${P}1a, ${B}0f)` : C, border: `1px solid ${plan.featured ? `${P}55` : BRD}`, boxShadow: plan.featured ? `0 0 40px ${P}20` : "none", position: "relative", overflow: "hidden" }}>
               {plan.featured && (
@@ -1090,9 +1090,9 @@ function TestimonialsSection() {
   ];
 
   return (
-    <section style={{ padding: "130px 60px", maxWidth: 1380, margin: "0 auto" }}>
+    <section className="landing-section" style={{ padding: "130px 60px", maxWidth: 1380, margin: "0 auto" }}>
       <SectionHeader tag="// TESTIMONIALS" title="Trusted by Leading<br/>Research Institutions." sub="Scientists worldwide use DSRA V2 to accelerate discovery and generate publication-ready insights." />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 22 }}>
+      <div className="test-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 22 }}>
         {quotes.map((q, i) => (
           <div key={i} className={`rv gc hl d${i + 1}`} style={{ padding: 32, borderRadius: 22 }}>
             <div style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 56, color: `${P}44`, lineHeight: 0.8, marginBottom: 18, userSelect: "none" }}>"</div>
@@ -1121,9 +1121,9 @@ function Footer() {
   ];
 
   return (
-    <footer style={{ background: "#0B0B0D", borderTop: `1px solid ${BRD}`, padding: "80px 60px 40px" }}>
+    <footer className="landing-footer" style={{ background: "#0B0B0D", borderTop: `1px solid ${BRD}`, padding: "80px 60px 40px" }}>
       <div style={{ maxWidth: 1380, margin: "0 auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1.6fr repeat(4, 1fr)", gap: 40, marginBottom: 64 }}>
+        <div className="footer-grid" style={{ display: "grid", gridTemplateColumns: "1.6fr repeat(4, 1fr)", gap: 40, marginBottom: 64 }}>
           {/* Brand */}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>

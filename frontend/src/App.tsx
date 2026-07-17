@@ -13,7 +13,9 @@ import {
   History,
   FolderHeart,
   Layers,
-  BookMarked
+  BookMarked,
+  Menu,
+  Home
 } from 'lucide-react';
 import { simulateResearch } from './services/mockSSE';
 import type { ReportDraft, VisualizationBundle } from './types';
@@ -29,6 +31,10 @@ export default function App() {
   const [showLanding, setShowLanding] = useState(true);
   // Theme control
   const [isLightMode, setIsLightMode] = useState(false);
+
+  // Mobile responsive view controls
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'configure' | 'viewer'>('configure');
 
   // Execution Mode (Simulator vs Live)
   const mode = 'live';
@@ -80,6 +86,22 @@ export default function App() {
       terminalContainerRef.current.scrollTop = terminalContainerRef.current.scrollHeight;
     }
   }, [logs]);
+
+  // History slide-back (popstate) landing page navigation
+  useEffect(() => {
+    window.history.replaceState({ page: 'landing' }, '');
+    
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state && event.state.page === 'workspace') {
+        setShowLanding(false);
+      } else {
+        setShowLanding(true);
+      }
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Load live history on mount if token exists
   useEffect(() => {
@@ -377,6 +399,8 @@ export default function App() {
 
   // Main start handler (routes based on mode)
   const handleStartResearch = () => {
+    setMobileTab('viewer');
+    setSidebarOpen(false);
     if (mode === 'live') {
       handleStartResearchLive();
       return;
@@ -517,6 +541,8 @@ export default function App() {
 
   // Main history / saved items selector
   const selectHistorySession = async (item: string | { id: string; title: string; date: string }) => {
+    setMobileTab('viewer');
+    setSidebarOpen(false);
     setViewMode('workspace');
     const title = typeof item === 'string' ? item : item.title;
     setTopic(title);
@@ -580,21 +606,58 @@ export default function App() {
   };
 
   if (showLanding) {
-    return <LandingPage onStart={() => setShowLanding(false)} />;
+    return <LandingPage onStart={() => { setShowLanding(false); window.history.pushState({ page: 'workspace' }, ''); }} />;
   }
 
   return (
     <div className="app-container">
       <div className="glow-orb glow-orb-1" />
       <div className="glow-orb glow-orb-2" />
+
+      {/* Mobile Top Header */}
+      <header className="mobile-app-header">
+        <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)}>
+          <Menu size={18} />
+        </button>
+        <span className="mobile-app-title" onClick={() => { setShowLanding(true); window.history.pushState({ page: 'landing' }, ''); }} style={{ cursor: 'pointer' }}>DSRA V2 Workspace</span>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button className="mobile-menu-btn" onClick={() => { setShowLanding(true); window.history.pushState({ page: 'landing' }, ''); }} title="Go to Home">
+            <Home size={18} />
+          </button>
+          <button className="mobile-menu-btn" onClick={toggleTheme}>
+            {isLightMode ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
+        </div>
+      </header>
+
+      {/* Sidebar Overlay backdrop on Mobile */}
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+
       {/* Sidebar Navigation */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
           <img src={dsraLogo} alt="DSRA Logo" className="brand-logo" />
           <span className="sidebar-logo">DSRA V2</span>
+          <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>
+            &times;
+          </button>
         </div>
 
         <div className="sidebar-menu">
+          {/* Home Button */}
+          <div 
+            className="menu-item" 
+            onClick={() => {
+              setShowLanding(true);
+              setSidebarOpen(false);
+              window.history.pushState({ page: 'landing' }, '');
+            }}
+            style={{ marginBottom: '8px' }}
+          >
+            <Home size={14} />
+            <span>Home</span>
+          </div>
+
           {/* Library Button */}
           {token && (
             <div 
@@ -697,7 +760,7 @@ export default function App() {
                 <p style={{ fontSize: '14px', marginTop: '8px' }}>Your library is currently empty. Start a new deep analysis to populate your environment.</p>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
                 {history.map(item => (
                   <div key={item.id} className="glass-card" style={{ padding: '20px', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', position: 'relative', overflow: 'hidden' }} onClick={() => selectHistorySession(item)}
                     onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 10px 25px rgba(0,0,0,0.2)'; }}
@@ -724,8 +787,24 @@ export default function App() {
           </div>
         ) : (
           <>
+            {/* Mobile Segmented Toggle */}
+            <div className="mobile-workspace-toggle">
+              <button 
+                className={`mobile-toggle-btn ${mobileTab === 'configure' ? 'active' : ''}`}
+                onClick={() => setMobileTab('configure')}
+              >
+                Configure
+              </button>
+              <button 
+                className={`mobile-toggle-btn ${mobileTab === 'viewer' ? 'active' : ''}`}
+                onClick={() => setMobileTab('viewer')}
+              >
+                Results {isRunning && <span className="pulse-dot" />}
+              </button>
+            </div>
+
             {/* Left Side: Control Board and SSE timeline */}
-            <section className="control-panel">
+            <section className={`control-panel ${mobileTab === 'configure' ? 'mobile-active' : ''}`}>
               <div className="glass-card">
             <h3 style={{ marginBottom: '14px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Search size={16} style={{ color: '#14b8a6' }} />
@@ -846,7 +925,7 @@ export default function App() {
         </section>
 
         {/* Right Side: Tab Panel and Result Viewers */}
-        <section className="content-viewer">
+        <section className={`content-viewer ${mobileTab === 'viewer' ? 'mobile-active' : ''}`}>
           {/* Header tabs controls */}
           <div className="tabs-header">
             <nav className="tabs-list-pill">
@@ -1168,7 +1247,7 @@ export default function App() {
               <div>
                 <h3 style={{ marginBottom: '20px' }}>Pipeline Analysis Quality Metrics</h3>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                <div className="metrics-grid">
                   {/* Distribution 1 */}
                   <div className="glass-card">
                     <h4 style={{ fontSize: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
